@@ -1,0 +1,45 @@
+
+<html>
+<head>
+<!-- <link rel="stylesheet" type="text/css" href="styles.css"> -->
+<script type="text/javascript"
+	src="https://www.gstatic.com/charts/loader.js"></script>
+
+<script src="js/chart.js" type="text/javascript" charset="utf-8"></script>
+<script src="js/common.js" type="text/javascript" charset="utf-8"></script>
+
+<script type="text/javascript">
+	google.charts.load('current', {
+		'packages' : [ 'corechart' ]
+	});
+	google.charts.setOnLoadCallback(initChart);
+	google.load("visualization", "1", {packages:["corechart"]});
+</script>
+</head>
+<table>
+	<tr>
+		<th>T</th>
+		<th>RH</th>
+		<th>CO2</th>
+		<th>PID</th>
+	</tr>
+	<tr>
+		<td><div id="temperatuur"
+				style="width: 100px; height: 40px; font-size: 20pt"></div></td>
+		<td><div id="vochtigheid"
+				style="width: 100px; height: 40px; font-size: 20pt"></div></td>
+		<td><div id="CO2"
+				style="width: 100px; height: 40px; font-size: 20pt";></div></td>
+		<td><div id="PID"
+				style="width: 100px; height: 40px; font-size: 20pt"></div></td>
+</table>
+
+<body>
+	<div id="tRHchart" style="width: 900px; height: 500px"></div>
+	<div id="CO2chart" style="width: 900px; height: 500px"></div>
+</body>
+
+</html>
+
+
+
