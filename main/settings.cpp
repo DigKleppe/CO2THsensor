@@ -16,9 +16,22 @@
 
 static const char *TAG = "Settings";
 
+extern settingsDescr_t settingsDescr[];
+extern int myRssi;
 bool settingsChanged;
 
-userSettings_t userSettings = { "0.0"}; // spiffs version
+char checkstr[MAX_STRLEN+1];
+
+const userSettings_t userSettingsDefaults = {
+	CONFIG_MDNS_HOSTNAME ,
+	"0.0",
+	USERSETTINGS_CHECKSTR
+};
+
+userSettings_t userSettings;
+
+
+extern "C" {
 
 esp_err_t saveSettings(void) {
 	nvs_handle_t my_handle;
@@ -55,13 +68,15 @@ esp_err_t saveSettings(void) {
 esp_err_t loadSettings() {
 	nvs_handle_t my_handle;
 	esp_err_t err = 0;
+	bool doSave = false;
 
 	err = nvs_open(STORAGE_NAMESPACE, NVS_READONLY, &my_handle);
-	size_t len = sizeof(wifiSettings_t);
+	size_t len;
 	if (err != ESP_OK) {
 		ESP_LOGE(TAG, "Error (%s) opening NVS handle!", esp_err_to_name(err));
 	} else {
 		ESP_LOGI(TAG, "reading SSID and password");
+		len =  sizeof(wifiSettings_t);
 		err = nvs_get_blob(my_handle, "WifiSettings", (void *) &wifiSettings, &len);
 		len = sizeof(userSettings_t);
 		err |= nvs_get_blob(my_handle, "userSettings",(void *) &userSettings, &len);
@@ -77,6 +92,27 @@ esp_err_t loadSettings() {
 		}
 		nvs_close(my_handle);
 	}
+// can be removed
+	if (strcmp(wifiSettings.upgradeFileName, CONFIG_FIRMWARE_UPGRADE_FILENAME) != 0) {
+		strcpy(wifiSettings.upgradeFileName, CONFIG_FIRMWARE_UPGRADE_FILENAME);
+		doSave = true;  // set filename for OTA via factory firmware
+	}
+
+	if(strncmp(userSettings.checkstr,USERSETTINGS_CHECKSTR, strlen (USERSETTINGS_CHECKSTR) )	!= 0)
+	{
+		userSettings = userSettingsDefaults;
+		wifiSettings = wifiSettingsDefaults;
+		ESP_LOGE(TAG, "default usersettings loaded");
+		doSave = true;  // set filename for OTA via factory firmware
+	}
+
+	if ( doSave)
+		return saveSettings();
+	else {
+		ESP_LOGI(TAG, "usersettings loaded");
+	}
 	return err;
+
+}
 }
 

@@ -19,7 +19,6 @@
 #include "esp_http_client.h"
 #include "esp_image_format.h"
 
-
 #include "string.h"
 
 #include "nvs.h"
@@ -33,19 +32,19 @@
 #include "wifiConnect.h"
 #include "settings.h"
 #include "updateSpiffsTask.h"
+#include "updateFirmWareTask.h"
 
 
 esp_err_t init_spiffs(void);
 TaskHandle_t connectTaskh;
 
-
 #define BLINK_GPIO	GPIO_NUM_4
-static const char *TAG = "mainSPIFFSOTA";
+static const char *TAG = "main";
 
 
 static void blinkTask(void *pvParameter) {
 	ESP_LOGI(TAG, "Example configured to blink GPIO LED!");
-	gpio_reset_pin (BLINK_GPIO);
+	gpio_reset_pin(BLINK_GPIO);
 	/* Set the GPIO as a push/pull output */
 	gpio_set_direction(BLINK_GPIO, GPIO_MODE_OUTPUT);
 
@@ -57,42 +56,14 @@ static void blinkTask(void *pvParameter) {
 	}
 }
 
-// ensure after reset back to factory app for OTA
-static void setBootPartitionToFactory(void) {
-	esp_image_metadata_t metaData;
-	esp_err_t err;
-
-	const esp_partition_t *factPart = esp_partition_find_first(ESP_PARTITION_TYPE_APP, ESP_PARTITION_SUBTYPE_APP_FACTORY, "factory");
-	if (factPart != NULL) {
-		esp_partition_pos_t factPartPos;
-		factPartPos.offset = factPart->address;
-		factPartPos.size = factPart->size;
-
-		esp_image_verify(ESP_IMAGE_VERIFY, &factPartPos, &metaData);
-
-		if (metaData.image.magic == ESP_IMAGE_HEADER_MAGIC) {
-			ESP_LOGI(TAG, "Setting bootpartition to OTA factory");
-
-			err = esp_ota_set_boot_partition(factPart);
-			if (err != ESP_OK) {
-				ESP_LOGE(TAG, "esp_ota_set_boot_partition failed (%s)!", esp_err_to_name(err));
-			}
-		}
-	}
-}
-
 extern "C" void app_main(void) {
-	TaskHandle_t otaTaskh;
 	esp_err_t err;
-	char newStorageVersion[MAX_STORAGEVERSIONSIZE] = {};
+	TaskHandle_t otaTaskh;
+	char newStorageVersion[MAX_STORAGEVERSIONSIZE] = { };
+	char newFirmWareVersion[MAX_STORAGEVERSIONSIZE] = { };
+	ESP_LOGI(TAG, "OTA template started\n\n");
 
-	ESP_LOGI(TAG, "OTA Klp_main start");
-
-	setBootPartitionToFactory();
-
-	xTaskCreate(&blinkTask, "blink", 8192, NULL, 5, NULL);
 	ESP_ERROR_CHECK(init_spiffs());
-
 	err = nvs_flash_init();
 	if (err == ESP_ERR_NVS_NO_FREE_PAGES || err == ESP_ERR_NVS_NEW_VERSION_FOUND) {
 		ESP_ERROR_CHECK(nvs_flash_erase());
@@ -101,29 +72,37 @@ extern "C" void app_main(void) {
 	ESP_ERROR_CHECK(err);
 
 	loadSettings();
-	if (strcmp(wifiSettings.upgradeFileName ,CONFIG_FIRMWARE_UPGRADE_FILENAME)!= 0) {
-		strcpy(wifiSettings.upgradeFileName, CONFIG_FIRMWARE_UPGRADE_FILENAME);
-		saveSettings();  // set filename for OTA via factory firmware
-	}
 
+	if ((strcmp(wifiSettings.upgradeFileName, CONFIG_FIRMWARE_UPGRADE_FILENAME) != 0) ||
+		(strcmp(wifiSettings.upgradeURL, CONFIG_DEFAULT_FIRMWARE_UPGRADE_URL) != 0))
+	{
+		strcpy(wifiSettings.upgradeFileName, CONFIG_FIRMWARE_UPGRADE_FILENAME);
+		strcpy(wifiSettings.upgradeURL, CONFIG_DEFAULT_FIRMWARE_UPGRADE_URL);
+		saveSettings();
+	}
+	xTaskCreate(&blinkTask, "blink", 8192, NULL, 5, NULL);
+
+	ESP_ERROR_CHECK(esp_event_loop_create_default());
 	wifiConnect();
 
 	do {
-		vTaskDelay(1000);
-	} while ( connectStatus != IP_RECEIVED);
+		vTaskDelay(100);
+	} while (connectStatus != IP_RECEIVED);
+
+	xTaskCreate(&updateFirmwareTask, "updateFirmwareTask",2* 8192, NULL, 5, &otaTaskh);
 
 	while (1) {
-		vTaskDelay(10000);
-		newStorageVersion[0] = 0;
-		spiffsUpdateFinised = true;
-		xTaskCreate(&updateSpiffsTask, "updateSpiffsTask", 8192, (void *)newStorageVersion, 5, &otaTaskh);
-		while( !spiffsUpdateFinised)
-			vTaskDelay(1000);
-
-		if ( newStorageVersion[0]) {
-			strcpy( userSettings.spiffsVersion ,newStorageVersion );
-			saveSettings();
-		}
+//		newStorageVersion[0] = 0;
+//		spiffsUpdateFinised = true;
+//		xTaskCreate(&updateSpiffsTask, "updateSpiffsTask", 8192, (void*) newStorageVersion, 5, NULL);
+//		while (!spiffsUpdateFinised)
+//			vTaskDelay(1000);
+//
+//		if (newStorageVersion[0]) {
+//			strcpy(userSettings.spiffsVersion, newStorageVersion);
+//			saveSettings();
+//		}
+		vTaskDelay(100000);
 	}
 }
 

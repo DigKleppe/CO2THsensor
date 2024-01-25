@@ -23,6 +23,10 @@
 #include "freertos/semphr.h"
 
 
+void parseCGIWriteData(char *buf, int received) {
+
+}
+
 int getRTMeasValuesScript(char *pBuffer, int count) {
 	int len = 0;
 	return len;

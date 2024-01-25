@@ -28,8 +28,10 @@ typedef struct {
 	char pwd[64];
 	esp_ip4_addr_t ip4Address;
 	esp_ip4_addr_t gw;
-	char upgradeURL[128];
-	char upgradeFileName[32];
+	char upgradeServer[32] ; // eg www.github.com
+	char upgradeURL[128]; 	 // eg  https://digkleppe.github.io//OTAtemplate
+	char upgradeFileName[32]; // name of firmware
+	char firmwareVersion[16]; // holding current app version
 	bool updated;
 }wifiSettings_t;
 

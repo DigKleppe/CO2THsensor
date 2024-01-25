@@ -15,8 +15,7 @@
 
 typedef enum { FLT, STR, INT , DESCR , CALVAL} varType_t;
 #define MAX_STRLEN 32
-#define CHECKSTR 	 "test1"
-
+#define USERSETTINGS_CHECKSTR 	"test123"
 
 typedef struct {
 	char moduleName[MAX_STRLEN+1];
@@ -34,9 +33,10 @@ typedef struct {
 
 extern settingsDescr_t settingsDescr[];
 extern bool settingsChanged;
-
-esp_err_t saveSettings( void);
-esp_err_t loadSettings( void);
+extern "C" {
+	esp_err_t saveSettings( void);
+	esp_err_t loadSettings( void);
+}
 
 extern userSettings_t userSettings;
 
