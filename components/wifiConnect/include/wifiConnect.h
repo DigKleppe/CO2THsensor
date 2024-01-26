@@ -8,6 +8,8 @@
 #ifndef WIFI_CONNECT_H_
 #define WIFI_CONNECT_H_
 
+#define MAX_STORAGEVERSIONSIZE 16
+
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "esp_wifi.h"
@@ -31,7 +33,8 @@ typedef struct {
 	char upgradeServer[32] ; // eg www.github.com
 	char upgradeURL[128]; 	 // eg  https://digkleppe.github.io//OTAtemplate
 	char upgradeFileName[32]; // name of firmware
-	char firmwareVersion[16]; // holding current app version
+	char firmwareVersion[MAX_STORAGEVERSIONSIZE]; // holding current app version
+	char SPIFFSversion[MAX_STORAGEVERSIONSIZE];	// holding current spiffs version
 	bool updated;
 }wifiSettings_t;
 

@@ -43,10 +43,6 @@ static void setStaticIp(esp_netif_t *netif);
 esp_err_t saveSettings(void);
 
 volatile  connectStatus_t connectStatus;
-
-//#define EXAMPLE_ESP_WIFI_SSID      "xxx"
-//#define EXAMPLE_ESP_WIFI_PASS      "yyy"
-
 wifiSettings_t wifiSettings;
 
 // @formatter:off
@@ -54,7 +50,7 @@ wifiSettings_t wifiSettings;
 wifiSettings_t wifiSettingsDefaults = {
 		CONFIG_EXAMPLE_WIFI_SSID, CONFIG_EXAMPLE_WIFI_PASSWORD,ipaddr_addr(DEFAULT_IPADDRESS),
 		ipaddr_addr(DEFAULT_GW),CONFIG_DEFAULT_FIRMWARE_UPGRADE_SERVER,
-		CONFIG_DEFAULT_FIRMWARE_UPGRADE_URL,CONFIG_FIRMWARE_UPGRADE_FILENAME,false
+		CONFIG_DEFAULT_FIRMWARE_UPGRADE_URL,CONFIG_FIRMWARE_UPGRADE_FILENAME,"999","999"
 };
 
 // @formatter:on
@@ -168,7 +164,6 @@ static void smartconfigTask(void * parm)
 		}
     }
 }
-
 
 static void event_handler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data) {
 

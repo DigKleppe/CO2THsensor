@@ -6,33 +6,23 @@
 //   software is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
 //   CONDITIONS OF ANY KIND, either express or implied.
 //*/
+
+
+
 #include <string.h>
-#include "errno.h"
-#include <inttypes.h>
 
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
-#include "esp_system.h"
 #include "esp_event.h"
 #include "esp_log.h"
-#include "esp_ota_ops.h"
-#include "esp_http_client.h"
-#include "esp_image_format.h"
-
-#include "string.h"
 
 #include "nvs.h"
 #include "nvs_flash.h"
-//#include "protocol_examples_common.h"
-//#include <sys/socket.h>
-//#if CONFIG_EXAMPLE_CONNECT_WIFI
-//#include "esp_wifi.h"
-//#endif
 #include "driver/gpio.h"
 #include "wifiConnect.h"
 #include "settings.h"
-#include "updateSpiffsTask.h"
-#include "updateFirmWareTask.h"
+#include "updateTask.h"
+#include <esp_err.h>
 
 
 esp_err_t init_spiffs(void);
@@ -43,7 +33,7 @@ static const char *TAG = "main";
 
 
 static void blinkTask(void *pvParameter) {
-	ESP_LOGI(TAG, "Example configured to blink GPIO LED!");
+
 	gpio_reset_pin(BLINK_GPIO);
 	/* Set the GPIO as a push/pull output */
 	gpio_set_direction(BLINK_GPIO, GPIO_MODE_OUTPUT);
@@ -58,38 +48,28 @@ static void blinkTask(void *pvParameter) {
 
 extern "C" void app_main(void) {
 	esp_err_t err;
-	TaskHandle_t otaTaskh;
-	char newStorageVersion[MAX_STORAGEVERSIONSIZE] = { };
-	char newFirmWareVersion[MAX_STORAGEVERSIONSIZE] = { };
+	TaskHandle_t updateTaskh;
+
 	ESP_LOGI(TAG, "OTA template started\n\n");
 
 	ESP_ERROR_CHECK(init_spiffs());
 	err = nvs_flash_init();
 	if (err == ESP_ERR_NVS_NO_FREE_PAGES || err == ESP_ERR_NVS_NEW_VERSION_FOUND) {
 		ESP_ERROR_CHECK(nvs_flash_erase());
-		err = nvs_flash_init();
+		ESP_ERROR_CHECK(nvs_flash_init());
 	}
-	ESP_ERROR_CHECK(err);
+	ESP_ERROR_CHECK(esp_event_loop_create_default());
 
 	loadSettings();
-
-	if ((strcmp(wifiSettings.upgradeFileName, CONFIG_FIRMWARE_UPGRADE_FILENAME) != 0) ||
-		(strcmp(wifiSettings.upgradeURL, CONFIG_DEFAULT_FIRMWARE_UPGRADE_URL) != 0))
-	{
-		strcpy(wifiSettings.upgradeFileName, CONFIG_FIRMWARE_UPGRADE_FILENAME);
-		strcpy(wifiSettings.upgradeURL, CONFIG_DEFAULT_FIRMWARE_UPGRADE_URL);
-		saveSettings();
-	}
 	xTaskCreate(&blinkTask, "blink", 8192, NULL, 5, NULL);
 
-	ESP_ERROR_CHECK(esp_event_loop_create_default());
 	wifiConnect();
 
 	do {
 		vTaskDelay(100);
 	} while (connectStatus != IP_RECEIVED);
 
-	xTaskCreate(&updateFirmwareTask, "updateFirmwareTask",2* 8192, NULL, 5, &otaTaskh);
+	xTaskCreate(&updateTask, "updateTask",2* 8192, NULL, 5, &updateTaskh);
 
 	while (1) {
 //		newStorageVersion[0] = 0;

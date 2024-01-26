@@ -9,7 +9,7 @@
 #define COMPONENTS_SPIFFSOTA_INCLUDE_UPDATESPIFFSTASK_H_
 
 #define MAX_STORAGEVERSIONSIZE 16
-#define SPIFFS_INFO_FILENAME "storageVersion.txt"
+
 
 void updateSpiffsTask(void *pvParameter);
 extern volatile bool spiffsUpdateFinised;

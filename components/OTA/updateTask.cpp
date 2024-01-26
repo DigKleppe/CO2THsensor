@@ -6,37 +6,28 @@
  */
 
 #include <string.h>
-#include "errno.h"
 #include <inttypes.h>
-
+#include "errno.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "esp_system.h"
 #include "esp_log.h"
-#include "esp_http_client.h"
+#include "esp_ota_ops.h"
 
 #include "wifiConnect.h"
 #include "settings.h"
 #include "httpsRequest.h"
-#include "include/getNewVersion.h"
+#include "updateTask.h"
+#include "updateFirmWareTask.h"
+#include "updateSpiffsTask.h"
 
-#include <getNewVersion.h>
-#include "esp_app_format.h"
-#include "esp_http_client.h"
-#include "esp_flash_partitions.h"
-#include "esp_partition.h"
-#include "nvs.h"
-#include "nvs_flash.h"
-#include "errno.h"
+static const char *TAG = "updateTask";
 
-static const char *TAG = "getNewFirmWareVersionTask";
 
-#define BUFFSIZE 1024
-#define UPDATETIMEOUT (CONFIG_OTA_RECV_TIMEOUT / portTICK_PERIOD_MS)
 
-volatile bool getNewVersionTaskFinished;
 
 volatile updateStatus_t updateStatus;
+volatile bool getNewVersionTaskFinished;
 
 typedef struct {
 	char *infoFileName;
@@ -51,22 +42,19 @@ void getNewVersionTask(void *pvParameter) {
 	bool rdy = false;
 	httpsRegParams_t httpsRegParams;
 	versionInfoParam_t *versionInfoParam = (versionInfoParam_t*) pvParameter;
-	getNewFirmwareVersionTaskFinished = false;
+	getNewVersionTaskFinished = false;
 
 	httpsRegParams.httpsServer = wifiSettings.upgradeServer;
-
 	strcpy(updateURL, wifiSettings.upgradeURL);
 	strcat(updateURL, "//");
 	strcat(updateURL, versionInfoParam->infoFileName);
 	httpsRegParams.httpsURL = updateURL;
-	httpsRegParams.destbuffer = versionInfoParam->dest;
+	httpsRegParams.destbuffer = (uint8_t*) versionInfoParam->dest;
 	httpsRegParams.maxChars = MAX_STORAGEVERSIONSIZE - 1;
-
-	int block = 0;
 
 	int data_read;
 
-	ESP_LOGI(TAG, "Starting getNewFirmWareVersionTask");
+	ESP_LOGI(TAG, "Starting getNewVersionTask");
 
 	xTaskCreate(&httpsGetRequestTask, "httpsGetRequestTask", 2 * 8192, (void*) &httpsRegParams, 5, NULL); // todo stack minimize
 	vTaskDelay(100 / portTICK_PERIOD_MS); // wait for messagebox to create and connection to make
@@ -91,7 +79,7 @@ void getNewVersionTask(void *pvParameter) {
 		xQueueReceive(httpsReqMssgBox, (void*) &mssg, UPDATETIMEOUT); // wait for httpsGetRequestTask to end
 	};
 
-	getNewFirmwareVersionTaskFinished = true;
+	getNewVersionTaskFinished = true;
 	(void) vTaskDelete(NULL);
 }
 
@@ -116,6 +104,14 @@ esp_err_t getNewVersion(char *infoFileName, char *newVersion) {
 void updateTask(void *pvParameter) {
 	bool doUpdate;
 	char newVersion[MAX_STORAGEVERSIONSIZE];
+	TaskHandle_t updateFWTaskh;
+	TaskHandle_t updateSPIFFSTaskh;
+
+	if ((strcmp(wifiSettings.upgradeFileName, CONFIG_FIRMWARE_UPGRADE_FILENAME) != 0) || (strcmp(wifiSettings.upgradeURL, CONFIG_DEFAULT_FIRMWARE_UPGRADE_URL) != 0)) {
+		strcpy(wifiSettings.upgradeFileName, CONFIG_FIRMWARE_UPGRADE_FILENAME);
+		strcpy(wifiSettings.upgradeURL, CONFIG_DEFAULT_FIRMWARE_UPGRADE_URL);
+		saveSettings();
+	}
 
 	const esp_partition_t *update_partition = NULL;
 	const esp_partition_t *configured = esp_ota_get_boot_partition();
@@ -141,43 +137,52 @@ void updateTask(void *pvParameter) {
 
 		if (doUpdate) {
 			ESP_LOGI(TAG, "Updating firmware to version: %s", newVersion);
-			xTaskCreate(&updateFirmwareTask, "updateFirmwareTask", 2 * 8192, NULL, 5, &otaTaskh);
+			xTaskCreate(&updateFirmwareTask, "updateFirmwareTask", 2 * 8192, NULL, 5, &updateFWTaskh);
 			vTaskDelay(100 / portTICK_PERIOD_MS);
 			while (updateStatus == UPDATE_BUSY)
 				vTaskDelay(100 / portTICK_PERIOD_MS);
 
 			if (updateStatus == UPDATE_RDY) {
-				ESP_LOGI(TAG, "Prepare to restart system!");
+				strcpy(wifiSettings.firmwareVersion, newVersion);
+				saveSettings();
+				ESP_LOGI(TAG, "Update successfull, restarting system!");
 				vTaskDelay(100 / portTICK_PERIOD_MS);
 				esp_restart();
 			} else
 				ESP_LOGI(TAG, "Update firmware failed!");
 		}
 
+// ********************* SPIFFS update ***************************
+
 		doUpdate = false;
 		getNewVersion(SPIFFS_INFO_FILENAME, newVersion);
 		if (newVersion[0] != 0) {
-			if (strcmp(newVersion, wifiSettings.firmwareVersion) != 0) {
+			if (strcmp(newVersion, wifiSettings.SPIFFSversion) != 0) {
 				ESP_LOGI(TAG, "New SPIFFS version available: %s", newVersion);
 				doUpdate = true;
 			} else
-				ESP_LOGI(TAG, "SPIFFS  up to date: %s", newVersion);
+				ESP_LOGI(TAG, "SPIFFS up to date: %s", newVersion);
 		} else
 			ESP_LOGI(TAG, "Reading New SPIFFS info failed");
 
 		if (doUpdate) {
 			ESP_LOGI(TAG, "Updating SPIFFS to version: %s", newVersion);
-			xTaskCreate(&updateSpiffsTask, "updateSpiffsTask", 2 * 8192, NULL, 5, &otaTaskh);
+			xTaskCreate(&updateSpiffsTask, "updateSpiffsTask", 2 * 8192, NULL, 5, &updateSPIFFSTaskh);
 			vTaskDelay(100 / portTICK_PERIOD_MS);
-			while (updateStatus == UPDATE_BUSY)
+
+			while (updateStatus == UPDATE_BUSY) // wait for task to finish
 				vTaskDelay(100 / portTICK_PERIOD_MS);
 
 			if (updateStatus == UPDATE_RDY) {
-				ESP_LOGI(TAG, "SPIFFS flashed OK", newVersion);
+				ESP_LOGI(TAG, "SPIFFS flashed OK");
+				strcpy(wifiSettings.SPIFFSversion, newVersion);
+				saveSettings();
 			} else
 				ESP_LOGI(TAG, "Update SPIFFS failed!");
 		}
+	//	vTaskDelay(CONFIG_CHECK_FIRMWARWE_UPDATE_INTERVAL / portTICK_PERIOD_MS);
 		vTaskDelay(10000 / portTICK_PERIOD_MS);
 	}
 }
+
 
