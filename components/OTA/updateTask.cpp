@@ -61,14 +61,14 @@ void getNewVersionTask(void *pvParameter) {
 	xQueueSend(httpsReqRdyMssgBox, &mssg, 0);
 	if (xQueueReceive(httpsReqMssgBox, (void*) &mssg, UPDATETIMEOUT)) {
 		if (mssg.len <= 0) {
-			ESP_LOGE(TAG, "error reading info file firmware version: %s", BINARY_INFO_FILENAME);
+			ESP_LOGE(TAG, "error reading info file: %s", BINARY_INFO_FILENAME);
 			httpsRegParams.destbuffer[0] = -1;
 		} else {
 			if (mssg.len < MAX_STORAGEVERSIONSIZE) {
 				httpsRegParams.destbuffer[mssg.len] = 0;
-				ESP_LOGI(TAG, "New firmware version: %s", httpsRegParams.destbuffer);
+				ESP_LOGI(TAG, "New version: %s", httpsRegParams.destbuffer);
 			} else {
-				ESP_LOGE(TAG, "read firmware version too long: %s", BINARY_INFO_FILENAME);
+				ESP_LOGE(TAG, "read version too long: %s", BINARY_INFO_FILENAME);
 				httpsRegParams.destbuffer[0] = -1;
 			}
 		}

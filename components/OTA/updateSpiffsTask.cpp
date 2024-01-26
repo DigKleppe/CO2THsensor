@@ -48,10 +48,10 @@ void updateSpiffsTask(void *pvParameter) {
 	httpsRegParams.httpsURL = updateURL;
 
 	httpsRegParams.destbuffer = ota_write_data;
-	httpsRegParams.maxChars = sizeof(ota_write_data - 1);
+	httpsRegParams.maxChars = sizeof(ota_write_data) ;
 
 	xTaskCreate(&httpsGetRequestTask, "httpsGetRequestTask", 8192, (void*) &httpsRegParams, 5, NULL);
-
+	vTaskDelay(10);
 	/*deal with all receive packet*/
 
 	while (!rdy && (err == ESP_OK)) {
@@ -59,6 +59,8 @@ void updateSpiffsTask(void *pvParameter) {
 		if (xQueueReceive(httpsReqMssgBox, (void*) &mssg, ( UPDATETIMEOUT / portTICK_PERIOD_MS))) {
 			data_read = mssg.len;
 			block++;
+			putchar('.');
+		//	ESP_LOGI(TAG, "Reading block %d bytes %d ", block ,data_read);
 			if (data_read < 0) {
 				ESP_LOGE(TAG, "Error reading");
 				err = !ESP_OK;

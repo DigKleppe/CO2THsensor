@@ -23,7 +23,7 @@
 
 //#define DOWNLOAD_ONLY
 
-static uint8_t ota_write_data[BUFFSIZE + 1] = { 0 };
+static uint8_t ota_write_data[BUFFSIZE];
 
 static const char *TAG = "updateFirmwareTask";
 
