@@ -23,24 +23,11 @@
 #include "freertos/semphr.h"
 
 
-void parseCGIWriteData(char *buf, int received) {
-
-}
-
-int getRTMeasValuesScript(char *pBuffer, int count) {
-	int len = 0;
-	return len;
-}
-
-int getLogScript(char *pBuffer, int count) {
-	return 0;
-}
-
 extern int myRssi;
 
 const tCGI *g_pCGIs;
 int g_iNumCGIs;
-
+extern bool settingsChanged;
 
 #define NUM_CGIurls 5
 
@@ -50,8 +37,8 @@ const char* startCGIscript(int iIndex, char *pcParam);
 const char* readCGIvalues(int iIndex, char *pcParam);
 
 int readVarScript(char *pBuffer, int count);
-int getLogScript(char *pBuffer, int count);
-int getRTMeasValuesScript(char *pBuffer, int count);
+extern int getLogScript(char *pBuffer, int count);
+extern int getRTMeasValuesScript(char *pBuffer, int count);
 //int getAvgMeasValuesScript(char *pBuffer, int count);
 
 
@@ -247,6 +234,19 @@ int readDescriptorsScript(char *pBuffer, int count) {
 	return 0;
 }
 
+int doCalibrateScript(char *pBuffer, int count) {
+switch (scriptState) {
+case 0:
+	scriptState++;
+	strcpy (pBuffer,"Ok");
+	return 3;
+
+	break;
+default:
+	break;
+}
+return 0;
+}
 
 
 
@@ -336,3 +336,6 @@ void CGI_init(void) {
 
 }
 
+void parseCGIWriteData( char * buf, int received) { // not used
+
+};

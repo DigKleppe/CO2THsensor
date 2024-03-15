@@ -21,3 +21,5 @@ extern const tCGI *g_pCGIs;
 extern int g_iNumCGIs;
 
 #endif /* HTTPD_CGI_H_ */
+
+

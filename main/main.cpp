@@ -1,13 +1,3 @@
-///* OTA example
-//
-//   This example code is in the Public Domain (or CC0 licensed, at your option.)
-//
-//   Unless required by applicable law or agreed to in writing, this
-//   software is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
-//   CONDITIONS OF ANY KIND, either express or implied.
-//*/
-
-
 
 #include <string.h>
 
@@ -24,15 +14,12 @@
 #include "updateTask.h"
 #include <esp_err.h>
 
-
-
-
 esp_err_t init_spiffs(void);
-TaskHandle_t connectTaskh;
+
+void sensorTask(void *pvParameter);
 
 #define BLINK_GPIO	GPIO_NUM_4
 static const char *TAG = "main";
-
 
 static void blinkTask(void *pvParameter) {
 
@@ -52,7 +39,7 @@ extern "C" void app_main(void) {
 	esp_err_t err;
 	TaskHandle_t updateTaskh;
 
-	ESP_LOGI(TAG, "OTA template started\n\n");
+	ESP_LOGI(TAG, "started\n\n");
 
 	ESP_ERROR_CHECK(init_spiffs());
 	err = nvs_flash_init();
@@ -72,6 +59,7 @@ extern "C" void app_main(void) {
 	} while (connectStatus != IP_RECEIVED);
 
 	xTaskCreate(&updateTask, "updateTask",2* 8192, NULL, 5, &updateTaskh);
+    xTaskCreate(sensorTask, "sensorTask", 1024 * 5, (void*) 0, 10, NULL);
 
 	while (1) {
 //		newStorageVersion[0] = 0;

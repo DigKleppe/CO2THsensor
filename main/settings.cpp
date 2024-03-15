@@ -12,6 +12,7 @@
 #include <string.h>
 #include <cerrno>
 
+
 #define STORAGE_NAMESPACE "storage"
 
 static const char *TAG = "Settings";
