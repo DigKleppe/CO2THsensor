@@ -1,0 +1,91 @@
+
+BODY
+{
+   font-family: Arial;
+   background-color: white;
+   margin: 10px;
+   padding: 0px
+}
+
+BODY.side
+{
+   font-family: Arial;
+   background-color: white;
+   margin: 10px;
+   padding: 0px
+}
+
+H1
+{
+   background-color: oldlace;
+   color: black;
+   height: 140;
+   font-weight: normal;
+   font-family: Arial;
+   font-size: 30pt;
+   text-decoration:none;
+   text-align: left;
+}
+
+p {
+     margin-bottom: 1.5cm;
+}
+
+
+input {
+    width: 300pt;
+    font-size: 40pt;
+}
+link {
+    font-size: 30pt;
+}
+
+a {font-size: 50pt}
+
+h2  {
+	font-size: 20pt;
+}
+label {
+	width: 100pt;
+    font-size: 30pt;
+}
+
+input[type=checkbox]
+{
+  /* Double-sized Checkboxes */
+  -ms-transform: scale(3); /* IE */
+  -moz-transform: scale(3); /* FF */
+  -webkit-transform: scale(3); /* Safari and Chrome */
+  -o-transform: scale(3); /* Opera */
+}
+
+/* Might want to wrap a span around your checkbox text */
+.checkboxtext
+{
+  /* Checkbox text */
+  font-size: 30pt;
+  display: inline;
+  
+}
+
+input[type=radio] {
+  transform: scale(2.5);
+  text-transform: scale(2.5);
+ }
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 15pt;
+}
+th.name  {
+  width: 22%
+}
+
+th.value {
+  width: 30%;
+}
+
+th.valueLong {
+	 width: 50%;
+}

@@ -1,4 +1,3 @@
-
 #include <string.h>
 
 #include "freertos/FreeRTOS.h"
@@ -12,6 +11,8 @@
 #include "wifiConnect.h"
 #include "settings.h"
 #include "updateTask.h"
+#include "guiTask.h"
+
 #include <esp_err.h>
 
 esp_err_t init_spiffs(void);
@@ -38,8 +39,15 @@ static void blinkTask(void *pvParameter) {
 extern "C" void app_main(void) {
 	esp_err_t err;
 	TaskHandle_t updateTaskh;
+	bool ipAddressShown = false;
+
+	displayMssg_t recDdisplayMssg;
+	char line[33];
+	int timeOut = 0;
 
 	ESP_LOGI(TAG, "started\n\n");
+
+	gpio_set_drive_capability((gpio_num_t) CONFIG_TFT_SCLK, GPIO_DRIVE_CAP_3);
 
 	ESP_ERROR_CHECK(init_spiffs());
 	err = nvs_flash_init();
@@ -50,29 +58,92 @@ extern "C" void app_main(void) {
 	ESP_ERROR_CHECK(esp_event_loop_create_default());
 
 	loadSettings();
-	xTaskCreate(&blinkTask, "blink", 8192, NULL, 5, NULL);
-
-	wifiConnect();
-
+//	xTaskCreate(&blinkTask, "blink", 8192, NULL, 5, NULL);
+	xTaskCreate(&guiTask, "guiTask", 1024 * 4, NULL, 0, NULL);
 	do {
-		vTaskDelay(100);
-	} while (connectStatus != IP_RECEIVED);
+		vTaskDelay(10);
+	} while (!displayReady);
 
-	xTaskCreate(&updateTask, "updateTask",2* 8192, NULL, 5, &updateTaskh);
-    xTaskCreate(sensorTask, "sensorTask", 1024 * 5, (void*) 0, 10, NULL);
+//	wifiConnect();
+
+	recDdisplayMssg.str1 = line;
+	recDdisplayMssg.showTime = 0;
+	recDdisplayMssg.line = 7;
+	sprintf(line, "Verbinden met");
+	xQueueSend(displayMssgBox, &recDdisplayMssg, 0);
+	xQueueReceive(displayReadyMssgBox, &recDdisplayMssg, portMAX_DELAY);
+	recDdisplayMssg.line = 8;
+	recDdisplayMssg.showTime = 500;
+	sprintf(line, "%s", wifiSettings.SSID);
+	xQueueSend(displayMssgBox, &recDdisplayMssg, 0);
+	xQueueReceive(displayReadyMssgBox, &recDdisplayMssg, portMAX_DELAY);
+
+	xTaskCreate(sensorTask, "sensorTask", 1024 * 5, (void*) 0, 10, NULL);
+
+	vTaskDelay(1000);
+//	do {
+//		vTaskDelay(1000);
+//		recDdisplayMssg.showTime = 0;
+//		recDdisplayMssg.line = 1;
+//		sprintf (line , "test %d", timeOut++);
+//		xQueueSend(displayMssgBox, &recDdisplayMssg, 0);
+//		xQueueReceive(displayReadyMssgBox, &recDdisplayMssg, portMAX_DELAY);
+//	} while(1);
+
+//	do {
+//		vTaskDelay(100);
+//	} while (connectStatus != IP_RECEIVED);
+
+	if (connectStatus == IP_RECEIVED) {
+		recDdisplayMssg.line = 7;
+		snprintf(line, sizeof(line), "%s", wifiSettings.SSID);
+		recDdisplayMssg.showTime = 0;
+		xQueueSend(displayMssgBox, &recDdisplayMssg, 500/portTICK_PERIOD_MS);
+		xQueueReceive(displayReadyMssgBox, &recDdisplayMssg, portMAX_DELAY);
+		recDdisplayMssg.line = 8;
+		recDdisplayMssg.showTime = 500;
+		sprintf(line, "%s", myIpAddress);
+		xQueueSend(displayMssgBox, &recDdisplayMssg, 0);
+		xQueueReceive(displayReadyMssgBox, &recDdisplayMssg, portMAX_DELAY);
+	}
+//
+//
+//
+//	xTaskCreate(&updateTask, "updateTask", 2 * 8192, NULL, 5, &updateTaskh);
+
+
 
 	while (1) {
-//		newStorageVersion[0] = 0;
-//		spiffsUpdateFinised = true;
-//		xTaskCreate(&updateSpiffsTask, "updateSpiffsTask", 8192, (void*) newStorageVersion, 5, NULL);
-//		while (!spiffsUpdateFinised)
-//			vTaskDelay(1000);
-//
-//		if (newStorageVersion[0]) {
-//			strcpy(userSettings.spiffsVersion, newStorageVersion);
-//			saveSettings();
-//		}
-		vTaskDelay(100000);
+		if (ipAddressShown) {
+			if (connectStatus == IP_RECEIVED) {
+				recDdisplayMssg.line = 7;
+				snprintf(line, sizeof(line), "%s", wifiSettings.SSID);
+				recDdisplayMssg.showTime = 0;
+				xQueueSend(displayMssgBox, &recDdisplayMssg, 500/portTICK_PERIOD_MS);
+				xQueueReceive(displayReadyMssgBox, &recDdisplayMssg, portMAX_DELAY);
+				recDdisplayMssg.line = 8;
+				recDdisplayMssg.showTime = 500;
+				sprintf(line, "%s", myIpAddress);
+				xQueueSend(displayMssgBox, &recDdisplayMssg, 0);
+				xQueueReceive(displayReadyMssgBox, &recDdisplayMssg, portMAX_DELAY);
+				ipAddressShown = true;
+			}
+		}
+		if (connectStatus == IP_RECEIVED) {
+			newStorageVersion[0] = 0;
+			spiffsUpdateFinised = true;
+			xTaskCreate(&updateSpiffsTask, "updateSpiffsTask", 8192, (void*) newStorageVersion, 5, NULL);
+			while (!spiffsUpdateFinised)
+				vTaskDelay(1000);
+
+			if (newStorageVersion[0]) {
+				strcpy(userSettings.spiffsVersion, newStorageVersion);
+				saveSettings();
+			}
+			vTaskDelay(3600 * 1000);
+		}
+		else
+			vTaskDelay(1000);
 	}
 }
 
