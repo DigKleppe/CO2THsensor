@@ -26,6 +26,8 @@
 #include "sensorTask.h"
 #include "Dht22.h"
 #include "udpClient.h"
+#include "guiTask.h"
+
 
 #define TIMER_DIVIDER         16  //  Hardware timer clock divider 80Mhz
 #define TIMER_SCALE           (TIMER_BASE_CLK / TIMER_DIVIDER)  // convert counter value to seconds
@@ -214,16 +216,17 @@ void sensorTask(void *pvParameter) {
 	int tempCO2value = 0;
 	esp_err_t err = 0;
 	int I2Ctimeout = 10;
-//	int dayMinutesPrescaler = DAYSAMPLESINTERVAL;
 
 	bool minutePassed = false;
+
+	displayMssg_t recDdisplayMssg;
+	char line[33];
+	recDdisplayMssg.str1 = line;
+
 	i2c_master_init();
-//	int n = 1;
 
 	xLastWakeTime = xTaskGetTickCount();
 
-//	while (1)
-//		vTaskDelayUntil(&xLastWakeTime, xPeriod);
 
 #ifdef SIMULATE
 	for ( n = 0; n < SAMPLESPERDAY ; n ++ ) {
@@ -261,6 +264,18 @@ void sensorTask(void *pvParameter) {
 			I2Ctimeout = 10;
 			measValues.temperature = temperature;
 			measValues.humidity = humidity;
+
+			recDdisplayMssg.line = 2;
+			recDdisplayMssg.showTime = 0;
+			sprintf(line, "T  : %2.1f", temperature);
+			xQueueSend(displayMssgBox, &recDdisplayMssg, 0);
+			xQueueReceive(displayReadyMssgBox, &recDdisplayMssg, portMAX_DELAY);
+
+			recDdisplayMssg.line = 4;
+			sprintf(line, "RH : %2.1f ", humidity);
+			xQueueSend(displayMssgBox, &recDdisplayMssg, 0);
+			xQueueReceive(displayReadyMssgBox, &recDdisplayMssg, portMAX_DELAY);
+
 			printf("\n temp: %2.2f , hum: %2.1f ", temperature, humidity);
 		} else {
 			measValues.temperature = 9999;
@@ -277,6 +292,11 @@ void sensorTask(void *pvParameter) {
 
 		if (err == ESP_OK) {
 			I2Ctimeout = 10;
+			recDdisplayMssg.line = 0;
+			sprintf(line, "CO2: %d", CO2value);
+			xQueueSend(displayMssgBox, &recDdisplayMssg, 0);
+			xQueueReceive(displayReadyMssgBox, &recDdisplayMssg, portMAX_DELAY);
+
 			printf(" CO2: %d ppm", CO2value);
 			measValues.CO2value = (float) CO2value;
 			sprintf( str, "2:%d",CO2value);

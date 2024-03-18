@@ -26,6 +26,7 @@ QueueHandle_t displayReadyMssgBox;
 volatile bool displayReady;
 
 #define LINESPACING 10
+#define Y_OFFSET 	4	// leave blank
 #define TFT_BACK_COLOR	TFT_DARKGREEN
 
 
@@ -58,7 +59,7 @@ void guiTask(void *pvParameter) {
 				fontHeight = 15;
 				tft.setFreeFont(&FreeMono12pt7b);
 			}
-			ypos = (recDdisplayMssg.line) * (fontHeight + LINESPACING);
+			ypos = Y_OFFSET + (recDdisplayMssg.line) * (fontHeight + LINESPACING);
 
 			tft.fillRect(0, ypos, TFT_WIDTH, fontHeight+ LINESPACING,  TFT_BACK_COLOR); // clear line
 			tft.setCursor(0,ypos + fontHeight);

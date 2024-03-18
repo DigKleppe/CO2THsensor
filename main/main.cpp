@@ -13,6 +13,7 @@
 #include "updateTask.h"
 #include "guiTask.h"
 
+
 #include <esp_err.h>
 
 esp_err_t init_spiffs(void);
@@ -32,18 +33,20 @@ static void blinkTask(void *pvParameter) {
 		gpio_set_level(BLINK_GPIO, 1);
 		vTaskDelay(1000 / portTICK_PERIOD_MS);
 		gpio_set_level(BLINK_GPIO, 0);
-		vTaskDelay(1000 / portTICK_PERIOD_MS);
+		if (connectStatus == IP_RECEIVED)
+			vTaskDelay(5000 / portTICK_PERIOD_MS);
+		else
+			vTaskDelay(1000 / portTICK_PERIOD_MS);
 	}
 }
 
 extern "C" void app_main(void) {
 	esp_err_t err;
-	TaskHandle_t updateTaskh;
 	bool ipAddressShown = false;
 
 	displayMssg_t recDdisplayMssg;
 	char line[33];
-	int timeOut = 0;
+//	int timeOut = 0;
 
 	ESP_LOGI(TAG, "started\n\n");
 
@@ -58,13 +61,13 @@ extern "C" void app_main(void) {
 	ESP_ERROR_CHECK(esp_event_loop_create_default());
 
 	loadSettings();
-//	xTaskCreate(&blinkTask, "blink", 8192, NULL, 5, NULL);
+	xTaskCreate(&blinkTask, "blink", 8192, NULL, 5, NULL);
 	xTaskCreate(&guiTask, "guiTask", 1024 * 4, NULL, 0, NULL);
 	do {
 		vTaskDelay(10);
 	} while (!displayReady);
 
-//	wifiConnect();
+	wifiConnect();
 
 	recDdisplayMssg.str1 = line;
 	recDdisplayMssg.showTime = 0;
@@ -94,27 +97,24 @@ extern "C" void app_main(void) {
 //		vTaskDelay(100);
 //	} while (connectStatus != IP_RECEIVED);
 
-	if (connectStatus == IP_RECEIVED) {
-		recDdisplayMssg.line = 7;
-		snprintf(line, sizeof(line), "%s", wifiSettings.SSID);
-		recDdisplayMssg.showTime = 0;
-		xQueueSend(displayMssgBox, &recDdisplayMssg, 500/portTICK_PERIOD_MS);
-		xQueueReceive(displayReadyMssgBox, &recDdisplayMssg, portMAX_DELAY);
-		recDdisplayMssg.line = 8;
-		recDdisplayMssg.showTime = 500;
-		sprintf(line, "%s", myIpAddress);
-		xQueueSend(displayMssgBox, &recDdisplayMssg, 0);
-		xQueueReceive(displayReadyMssgBox, &recDdisplayMssg, portMAX_DELAY);
-	}
+//	if (connectStatus == IP_RECEIVED) {
+//		recDdisplayMssg.line = 7;
+//		snprintf(line, sizeof(line), "%s", wifiSettings.SSID);
+//		recDdisplayMssg.showTime = 0;
+//		xQueueSend(displayMssgBox, &recDdisplayMssg, 500/portTICK_PERIOD_MS);
+//		xQueueReceive(displayReadyMssgBox, &recDdisplayMssg, portMAX_DELAY);
+//		recDdisplayMssg.line = 8;
+//		recDdisplayMssg.showTime = 500;
+//		sprintf(line, "%s", myIpAddress);
+//		xQueueSend(displayMssgBox, &recDdisplayMssg, 0);
+//		xQueueReceive(displayReadyMssgBox, &recDdisplayMssg, portMAX_DELAY);
+//	}
 //
 //
 //
-//	xTaskCreate(&updateTask, "updateTask", 2 * 8192, NULL, 5, &updateTaskh);
-
-
 
 	while (1) {
-		if (ipAddressShown) {
+		if (!ipAddressShown) {
 			if (connectStatus == IP_RECEIVED) {
 				recDdisplayMssg.line = 7;
 				snprintf(line, sizeof(line), "%s", wifiSettings.SSID);
@@ -127,23 +127,11 @@ extern "C" void app_main(void) {
 				xQueueSend(displayMssgBox, &recDdisplayMssg, 0);
 				xQueueReceive(displayReadyMssgBox, &recDdisplayMssg, portMAX_DELAY);
 				ipAddressShown = true;
-			}
-		}
-		if (connectStatus == IP_RECEIVED) {
-			newStorageVersion[0] = 0;
-			spiffsUpdateFinised = true;
-			xTaskCreate(&updateSpiffsTask, "updateSpiffsTask", 8192, (void*) newStorageVersion, 5, NULL);
-			while (!spiffsUpdateFinised)
-				vTaskDelay(1000);
 
-			if (newStorageVersion[0]) {
-				strcpy(userSettings.spiffsVersion, newStorageVersion);
-				saveSettings();
+				xTaskCreate(&updateTask, "updateTask", 2 * 8192, NULL, 5, NULL);
 			}
-			vTaskDelay(3600 * 1000);
 		}
-		else
-			vTaskDelay(1000);
+		vTaskDelay(1000);
 	}
 }
 
