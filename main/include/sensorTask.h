@@ -34,37 +34,17 @@ extern Averager temperatureDayBuffer;
 extern Averager humidityDayBuffer;
 extern Averager CO2DayBuffer;
 
-
-//
-//extern uint16_t temperatureDayBuffer[SAMPLESPERDAY];
-//extern uint16_t temperatureHourBuffer[SAMPLESPERHOUR];
-//extern uint16_t CO2DayBuffer[SAMPLESPERDAY];
-//extern uint16_t CO2HourBuffer[SAMPLESPERHOUR];
-//
-//
-//extern int temperatureHourBufValues;
-//extern int temperatureHourBufWrtIndex;
-//extern int temperatureDayBufValues;
-//extern int temperatureDayBufWrtIndex;
-//
-//extern int CO2HourBufValues;
-//extern int CO2HourBufWrtIndex;
-//extern int CO2DayBufValues;
-//extern int CO2DayBufWrtIndex;
-
-
 void pulseTimerTask(void *parameters);
 void sensorTask(void *pvParameter);
 
-typedef struct {
-	float seqNr;
-	float momentaryWatts;
-	float minuteTotalWh;
-	float hourTotalWh;
-	float dayTotalkWh;
-	float weekTotalkWh;
-}powers_t;
+int getInfoValuesScript (char *pBuffer, int count);
+int getCalValuesScript (char *pBuffer, int count);
+int saveSettingsScript (char *pBuffer, int count);
+int cancelSettingsScript (char *pBuffer, int count);
+int calibrateRespScript(char *pBuffer, int count);
+int getSensorNameScript (char *pBuffer, int count);
+void parseCGIWriteData(char *buf, int received);
 
-extern powers_t powers;
+
 
 #endif /* MAIN_SENSOR_H_ */

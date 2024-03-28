@@ -16,6 +16,7 @@ extern CGIresponseFileHandler_t readResponseFile;
 extern bool sendBackOK;
 int freadCGI( char *buffer, int count);
 void CGI_init( void );
+int actionRespScript(char *pBuffer, int count);
 
 extern const tCGI *g_pCGIs;
 extern int g_iNumCGIs;

@@ -16,6 +16,7 @@
 #include "cgiScripts.h"
 
 #include "../../main/include/settings.h"
+#include "../../main/include/sensorTask.h"
 #include "../http/include/httpd.h"
 
 #include "freertos/FreeRTOS.h"
@@ -29,7 +30,7 @@ const tCGI *g_pCGIs;
 int g_iNumCGIs;
 extern bool settingsChanged;
 
-#define NUM_CGIurls 5
+#define NUM_CGIurls 10
 
 // http:/192.168.2.7///cgi-bin/getLogMeasValues
 
@@ -39,11 +40,6 @@ const char* readCGIvalues(int iIndex, char *pcParam);
 int readVarScript(char *pBuffer, int count);
 extern int getLogScript(char *pBuffer, int count);
 extern int getRTMeasValuesScript(char *pBuffer, int count);
-//int getAvgMeasValuesScript(char *pBuffer, int count);
-
-
-
-
 
 int actionRespScript(char *pBuffer, int count);
 bool readActionScript(char *pcParam);
@@ -69,8 +65,11 @@ static const tCGI CGIurls[NUM_CGIurls] = {
 		{ "/action_page.php", (tCGIHandler_t) readCGIvalues,(CGIresponseFileHandler_t) actionRespScript },
 		{ "/cgi-bin/getLogMeasValues", (tCGIHandler_t) readCGIvalues, (CGIresponseFileHandler_t) getLogScript},
 		{ "/cgi-bin/getRTMeasValues", (tCGIHandler_t) readCGIvalues, (CGIresponseFileHandler_t) getRTMeasValuesScript},
-	//	{ "/cgi-bin/getAvgMeasValues", (tCGIHandler_t) readCGIvalues, (CGIresponseFileHandler_t) getAvgMeasValuesScript},
-
+		{ "/cgi-bin/getInfoValues", (tCGIHandler_t) readCGIvalues, (CGIresponseFileHandler_t) getInfoValuesScript},
+	    { "/cgi-bin/getCalValues", (tCGIHandler_t) readCGIvalues, (CGIresponseFileHandler_t) getCalValuesScript},
+		{ "/cgi-bin/getSensorName", (tCGIHandler_t) readCGIvalues, (CGIresponseFileHandler_t) getSensorNameScript},
+		{ "/cgi-bin/saveSettings", (tCGIHandler_t) readCGIvalues, (CGIresponseFileHandler_t) saveSettingsScript},
+		{ "/cgi-bin/cancelSettings", (tCGIHandler_t) readCGIvalues, (CGIresponseFileHandler_t) cancelSettingsScript},
 };
 
 static const CGIdesc_t CGIdescriptors[] = {
@@ -336,6 +335,3 @@ void CGI_init(void) {
 
 }
 
-void parseCGIWriteData( char * buf, int received) { // not used
-
-};

@@ -22,6 +22,8 @@ typedef enum { FLT, STR, INT , DESCR , CALVAL} varType_t;
 typedef struct {
 	char moduleName[MAX_STRLEN+1];
 	char spiffsVersion[16]; // holding current version
+	float temperatureOffset;
+	float RHOffset;
 	char checkstr[MAX_STRLEN+1];
 }userSettings_t;
 

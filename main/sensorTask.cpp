@@ -14,8 +14,9 @@
 
 #include "driver/gpio.h"
 #include "settings.h"
-#include "driver/timer.h"
+#include "driver/gptimer.h"
 #include "driver/i2c.h"
+#include "esp_log.h"
 
 #include <stdio.h>
 #include <time.h>
@@ -27,6 +28,9 @@
 #include "Dht22.h"
 #include "udpClient.h"
 #include "guiTask.h"
+#include "cgiScripts.h"
+
+static const char *TAG = "sensorTask";
 
 
 #define TIMER_DIVIDER         16  //  Hardware timer clock divider 80Mhz
@@ -81,7 +85,6 @@ typedef struct {
 	float temperature;
 	float hum;
 	int32_t co2;
-	float refTemperature;
 } log_t;
 
 static log_t tLog[ MAXLOGVALUES];
@@ -92,6 +95,8 @@ static int logTxIdx;
 static int logRxIdx;
 
 extern int scriptState;
+static float lastTemperature;
+static float lastRH;
 
 //
 //
@@ -255,6 +260,8 @@ void sensorTask(void *pvParameter) {
 		if (err == ESP_OK) {
 			temperature = dhtData.temperature;
 			humidity = dhtData.humidity;
+			lastTemperature = temperature;
+			lastRH= humidity;
 		}
 #endif
 		humidityHourBuffer.write((uint16_t) (100.0 * humidity));  // use last values for graph
@@ -371,10 +378,9 @@ int getRTMeasValuesScript(char *pBuffer, int count) {
 	case 0:
 		scriptState++;
 		len += sprintf(pBuffer + len, "%ld,", lastVal.timeStamp);
-		len += sprintf(pBuffer + len, "%3.2f,", lastVal.temperature);
-		len += sprintf(pBuffer + len, "%3.2f,", lastVal.hum);
+		len += sprintf(pBuffer + len, "%3.2f,", lastVal.temperature -userSettings.temperatureOffset);
+		len += sprintf(pBuffer + len, "%3.2f,", lastVal.hum -userSettings.RHOffset);
 		len += sprintf(pBuffer + len, "%ld,", lastVal.co2);
-		len += sprintf(pBuffer + len, "%3.3f\n", lastVal.refTemperature);
 		return len;
 		break;
 	default:
@@ -391,10 +397,9 @@ int getNewMeasValuesScript(char *pBuffer, int count) {
 	if (logRxIdx != (logTxIdx)) {  // something to send?
 		do {
 			len += sprintf(pBuffer + len, "%ld,", tLog[logRxIdx].timeStamp);
-			len += sprintf(pBuffer + len, "%3.2f,", tLog[logRxIdx].temperature);
-			len += sprintf(pBuffer + len, "%3.2f,", tLog[logRxIdx].hum);
+			len += sprintf(pBuffer + len, "%3.2f,", tLog[logRxIdx].temperature -userSettings.temperatureOffset);
+			len += sprintf(pBuffer + len, "%3.2f,", tLog[logRxIdx].hum-userSettings.RHOffset);
 			len += sprintf(pBuffer + len, "%ld,", tLog[logRxIdx].co2);
-			len += sprintf(pBuffer + len, "%3.3f\n", tLog[logRxIdx].refTemperature);
 			logRxIdx++;
 			if (logRxIdx > MAXLOGVALUES)
 				logRxIdx = 0;
@@ -435,10 +440,9 @@ int getLogScript(char *pBuffer, int count) {
 		if (logsToSend) {
 			do {
 				len += sprintf(pBuffer + len, "%ld,", tLog[logRxIdx].timeStamp);
-				len += sprintf(pBuffer + len, "%3.2f,", tLog[logRxIdx].temperature);
-				len += sprintf(pBuffer + len, "%3.2f,", tLog[logRxIdx].hum);
+				len += sprintf(pBuffer + len, "%3.2f,", tLog[logRxIdx].temperature-userSettings.temperatureOffset );
+				len += sprintf(pBuffer + len, "%3.2f,", tLog[logRxIdx].hum-userSettings.RHOffset);
 				len += sprintf(pBuffer + len, "%ld,", tLog[logRxIdx].co2);
-				len += sprintf(pBuffer + len, "%3.3f\n", tLog[logRxIdx].refTemperature);
 				logRxIdx++;
 				if (logRxIdx >= MAXLOGVALUES)
 					logRxIdx = 0;
@@ -451,4 +455,88 @@ int getLogScript(char *pBuffer, int count) {
 	return len;
 }
 
+
+int getSensorNameScript(char *pBuffer, int count) {
+	int len = 0;
+	switch (scriptState) {
+	case 0:
+		scriptState++;
+		len += sprintf(pBuffer + len, "Actueel,Nieuw\n");
+		len += sprintf(pBuffer + len, "%s\n", userSettings.moduleName);
+		return len;
+		break;
+	default:
+		break;
+	}
+	return 0;
+}
+
+int getInfoValuesScript(char *pBuffer, int count) {
+	int len = 0;
+	switch (scriptState) {
+	case 0:
+		scriptState++;
+		len += sprintf(pBuffer + len, "%s\n", "Meting,Actueel,Offset");
+		len += sprintf(pBuffer + len, "Temperatuur ,%3.2f,%3.2f\n", lastTemperature -userSettings.temperatureOffset, userSettings.temperatureOffset); // send values and offset
+		len += sprintf(pBuffer + len, "RH ,%3.1f,%3.2f\n", lastRH -userSettings.RHOffset, userSettings.RHOffset); // send values and offset
+
+		return len;
+		break;
+	default:
+		break;
+	}
+	return 0;
+}
+
+int getCalValuesScript(char *pBuffer, int count) {
+	int len = 0;
+	switch (scriptState) {
+	case 0:
+		scriptState++;
+		len += sprintf(pBuffer + len, "%s\n", "Meting,Referentie,Stel in,Herstel");
+		len += sprintf(pBuffer + len, "%s\n", "Temperatuur\n RH");
+		return len;
+		break;
+	default:
+		break;
+	}
+	return 0;
+}
+
+int saveSettingsScript(char *pBuffer, int count) {
+	saveSettings();
+	return 0;
+}
+
+int cancelSettingsScript(char *pBuffer, int count) {
+	loadSettings();
+	return 0;
+}
+
+// "setCal:Temperatuur=23"
+
+void parseCGIWriteData(char *buf, int received) {
+	float ref;
+	bool save = false;
+
+	if (sscanf( buf ,"setCal:Temperatuur=%f", &ref) == 1 ) {
+		userSettings.temperatureOffset = lastVal.temperature - ref;
+		ESP_LOGI(TAG, "temperatureOffset set to %f", userSettings.temperatureOffset);
+		save = true;
+	}
+	if (sscanf( buf ,"setCal:RH=%f", &ref) == 1 ) {
+		userSettings.RHOffset = lastVal.hum - ref;
+		ESP_LOGI(TAG, "RHOffset set to %f", userSettings.RHOffset);
+		save = true;
+	}
+
+	if (sscanf( buf ,"setName:=%s", userSettings.moduleName) == 1 ) {
+		ESP_LOGI(TAG, "Hostname set to %s", userSettings.moduleName);
+		save = true;
+	}
+
+	if ( save )
+		saveSettings();
+
+}
 
