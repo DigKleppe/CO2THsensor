@@ -40,7 +40,7 @@ typedef struct {
 
 extern wifiSettings_t wifiSettings;
 extern wifiSettings_t wifiSettingsDefaults;
-extern char ipstr[];
+extern char myIpAddress[];
 
 #define STATIC_NETMASK_ADDR "255.255.255.0"
 #define DEFAULT_IPADDRESS 	"192.168.2.50"

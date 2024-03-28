@@ -35,13 +35,11 @@ typedef struct {
 } versionInfoParam_t;
 
 void getNewVersionTask(void *pvParameter) {
-	esp_err_t err;
 	char updateURL[96];
-
 	httpsMssg_t mssg;
-	bool rdy = false;
 	httpsRegParams_t httpsRegParams;
 	versionInfoParam_t *versionInfoParam = (versionInfoParam_t*) pvParameter;
+
 	getNewVersionTaskFinished = false;
 
 	httpsRegParams.httpsServer = wifiSettings.upgradeServer;
@@ -52,8 +50,6 @@ void getNewVersionTask(void *pvParameter) {
 	httpsRegParams.destbuffer = (uint8_t*) versionInfoParam->dest;
 	httpsRegParams.maxChars = MAX_STORAGEVERSIONSIZE - 1;
 
-	int data_read;
-
 	ESP_LOGI(TAG, "Starting getNewVersionTask");
 
 	xTaskCreate(&httpsGetRequestTask, "httpsGetRequestTask", 2 * 8192, (void*) &httpsRegParams, 5, NULL); // todo stack minimize
@@ -62,14 +58,14 @@ void getNewVersionTask(void *pvParameter) {
 	if (xQueueReceive(httpsReqMssgBox, (void*) &mssg, UPDATETIMEOUT)) {
 		if (mssg.len <= 0) {
 			ESP_LOGE(TAG, "error reading info file: %s", BINARY_INFO_FILENAME);
-			httpsRegParams.destbuffer[0] = -1;
+			httpsRegParams.destbuffer[0] = 0;
 		} else {
 			if (mssg.len < MAX_STORAGEVERSIONSIZE) {
 				httpsRegParams.destbuffer[mssg.len] = 0;
 				ESP_LOGI(TAG, "New version: %s", httpsRegParams.destbuffer);
 			} else {
 				ESP_LOGE(TAG, "read version too long: %s", BINARY_INFO_FILENAME);
-				httpsRegParams.destbuffer[0] = -1;
+				httpsRegParams.destbuffer[0] = 0;
 			}
 		}
 	}
@@ -101,9 +97,11 @@ esp_err_t getNewVersion(char *infoFileName, char *newVersion) {
 		return ESP_FAIL;
 }
 
+
 void updateTask(void *pvParameter) {
 	bool doUpdate;
-	char newVersion[MAX_STORAGEVERSIONSIZE];
+	char newVersion[MAX_STORAGEVERSIONSIZE] = {0};
+
 	TaskHandle_t updateFWTaskh;
 	TaskHandle_t updateSPIFFSTaskh;
 
@@ -113,7 +111,6 @@ void updateTask(void *pvParameter) {
 		saveSettings();
 	}
 
-	const esp_partition_t *update_partition = NULL;
 	const esp_partition_t *configured = esp_ota_get_boot_partition();
 	const esp_partition_t *running = esp_ota_get_running_partition();
 
@@ -180,8 +177,8 @@ void updateTask(void *pvParameter) {
 			} else
 				ESP_LOGI(TAG, "Update SPIFFS failed!");
 		}
-	//	vTaskDelay(CONFIG_CHECK_FIRMWARWE_UPDATE_INTERVAL / portTICK_PERIOD_MS);
-		vTaskDelay(10000 / portTICK_PERIOD_MS);
+		vTaskDelay(CONFIG_CHECK_FIRMWARWE_UPDATE_INTERVAL * 60 * 60 * 1000 / portTICK_PERIOD_MS);
+	//	vTaskDelay(10000 / portTICK_PERIOD_MS);
 	}
 }
 
