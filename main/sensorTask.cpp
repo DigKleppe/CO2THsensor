@@ -272,14 +272,14 @@ void sensorTask(void *pvParameter) {
 			measValues.temperature = temperature;
 			measValues.humidity = humidity;
 
-			recDdisplayMssg.line = 2;
+			recDdisplayMssg.line = 1;
 			recDdisplayMssg.showTime = 0;
-			sprintf(line, "T  : %2.1f", temperature);
+			sprintf(line, "T  :%2.1f", temperature);
 			xQueueSend(displayMssgBox, &recDdisplayMssg, 0);
 			xQueueReceive(displayReadyMssgBox, &recDdisplayMssg, portMAX_DELAY);
 
-			recDdisplayMssg.line = 4;
-			sprintf(line, "RH : %2.1f ", humidity);
+			recDdisplayMssg.line = 2;
+			sprintf(line, "RH :%2.1f ", humidity);
 			xQueueSend(displayMssgBox, &recDdisplayMssg, 0);
 			xQueueReceive(displayReadyMssgBox, &recDdisplayMssg, portMAX_DELAY);
 
@@ -300,7 +300,7 @@ void sensorTask(void *pvParameter) {
 		if (err == ESP_OK) {
 			I2Ctimeout = 10;
 			recDdisplayMssg.line = 0;
-			sprintf(line, "CO2: %d", CO2value);
+			sprintf(line, "CO2:%d", CO2value);
 			xQueueSend(displayMssgBox, &recDdisplayMssg, 0);
 			xQueueReceive(displayReadyMssgBox, &recDdisplayMssg, portMAX_DELAY);
 
@@ -530,7 +530,7 @@ void parseCGIWriteData(char *buf, int received) {
 		save = true;
 	}
 
-	if (sscanf( buf ,"setName:=%s", userSettings.moduleName) == 1 ) {
+	if (sscanf( buf ,"setName:moduleName=%s", userSettings.moduleName) == 1 ) {
 		ESP_LOGI(TAG, "Hostname set to %s", userSettings.moduleName);
 		save = true;
 	}

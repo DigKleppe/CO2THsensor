@@ -71,11 +71,11 @@ extern "C" void app_main(void) {
 
 	recDdisplayMssg.str1 = line;
 	recDdisplayMssg.showTime = 0;
-	recDdisplayMssg.line = 7;
+	recDdisplayMssg.line = 5;
 	sprintf(line, "Verbinden met");
 	xQueueSend(displayMssgBox, &recDdisplayMssg, 0);
 	xQueueReceive(displayReadyMssgBox, &recDdisplayMssg, portMAX_DELAY);
-	recDdisplayMssg.line = 8;
+	recDdisplayMssg.line = 6;
 	recDdisplayMssg.showTime = 500;
 	sprintf(line, "%s", wifiSettings.SSID);
 	xQueueSend(displayMssgBox, &recDdisplayMssg, 0);
@@ -88,12 +88,12 @@ extern "C" void app_main(void) {
 	while (1) {
 		if (!ipAddressShown) {
 			if (connectStatus == IP_RECEIVED) {
-				recDdisplayMssg.line = 7;
+				recDdisplayMssg.line = 5;
 				snprintf(line, sizeof(line), "%s", wifiSettings.SSID);
 				recDdisplayMssg.showTime = 0;
 				xQueueSend(displayMssgBox, &recDdisplayMssg, 500/portTICK_PERIOD_MS);
 				xQueueReceive(displayReadyMssgBox, &recDdisplayMssg, portMAX_DELAY);
-				recDdisplayMssg.line = 8;
+				recDdisplayMssg.line = 6;
 				recDdisplayMssg.showTime = 500;
 				sprintf(line, "%s", myIpAddress);
 				xQueueSend(displayMssgBox, &recDdisplayMssg, 0);

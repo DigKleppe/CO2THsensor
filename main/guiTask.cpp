@@ -25,7 +25,7 @@ QueueHandle_t displayReadyMssgBox;
 
 volatile bool displayReady;
 
-#define LINESPACING 10
+#define LINESPACING 18
 #define Y_OFFSET 	4	// leave blank
 #define TFT_BACK_COLOR	TFT_DARKGREEN
 
@@ -52,11 +52,12 @@ void guiTask(void *pvParameter) {
 		if (xQueueReceive(displayMssgBox,(void * const) &recDdisplayMssg, portMAX_DELAY) == pdTRUE) {
 			if( recDdisplayMssg.line < 5)
 			{
-				fontHeight = 20;
-				tft.setFreeFont(&FreeMono18pt7b);
+				fontHeight = 28;
+			//	tft.setFreeFont(&FreeMono18pt7b);
+				tft.setFreeFont(&FreeMono24pt7b);
 			}
 			else {
-				fontHeight = 15;
+				fontHeight = 16;
 				tft.setFreeFont(&FreeMono12pt7b);
 			}
 			ypos = Y_OFFSET + (recDdisplayMssg.line) * (fontHeight + LINESPACING);

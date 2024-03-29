@@ -232,7 +232,7 @@ static esp_err_t download_get_handler(httpd_req_t *req) {
 	if (strcmp(filename, "/") == 0)  // klp default
 		strcpy(filename, "/index.html");
 
-	ESP_LOGE(TAG, "req file: %s", filename);
+//	ESP_LOGE(TAG, "req file: %s", filename);
 
 	set_content_type_from_file(req, filename);
 	/* If name has trailing '/', respond with directory contents */
@@ -303,7 +303,7 @@ static esp_err_t download_get_handler(httpd_req_t *req) {
 			do {
 				/* Read file in chunks into the scratch buffer */
 				chunksize = readResponseFile(chunk, SCRATCH_BUFSIZE);
-				ESP_LOGE(TAG, "sending %d bytes", chunksize);
+	//			ESP_LOGE(TAG, "sending %d bytes", chunksize);
 				if (chunksize > 0) {
 					/* Send the buffer contents as HTTP response chunk */
 					if (httpd_resp_send_chunk(req, chunk, chunksize) != ESP_OK) {
@@ -363,7 +363,7 @@ static esp_err_t download_get_handler(httpd_req_t *req) {
 		/* Close file after sending complete */
 		fclose(fd);
 	}
-	ESP_LOGI(TAG, "File sending complete %s (%ld bytes)", filename, file_stat.st_size);
+//	ESP_LOGI(TAG, "File sending complete %s (%ld bytes)", filename, file_stat.st_size);
 
 	/* Respond with an empty chunk to signal HTTP response completion */
 	httpd_resp_send_chunk(req, NULL, 0);
