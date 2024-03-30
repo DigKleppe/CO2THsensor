@@ -176,7 +176,34 @@ function simplot() {
 	plotArray(str2);
 }
 
+
 function plotArray(str) {
+	var arr;
+	var arr2 = str.split("\n");
+	var nrPoints = arr2.length - 1;
+
+	for (var p = 0; p < nrPoints; p++) {
+		arr = arr2[p].split(",");
+		if (arr.length >= 3) {
+			plotTempAndRH(1, arr[1]); // temperature
+			plotTempAndRH(2, arr[2]); // RH
+			plotCO2(1, arr[3]); // CO2
+		}
+	}
+	if (nrPoints == 1) { // then single point added 
+		updateLastDayTimeLabel(CO2Data);
+		updateLastDayTimeLabel(tempAndRHdata);
+	}
+	else {
+		updateAllDayTimeLabels(CO2Data);
+		updateAllDayTimeLabels(tempAndRHdata);
+	}
+
+	tRHchart.draw(tempAndRHdata, tempAndRHoptions);
+	CO2chart.draw(CO2Data, CO2Options);
+}
+
+function plotArrays(str) {
 	var arr;
 	var arr2 = str.split("\n");
 	var nrPoints = arr2.length - 1;

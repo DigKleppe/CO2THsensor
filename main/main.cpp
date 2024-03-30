@@ -46,7 +46,6 @@ extern "C" void app_main(void) {
 
 	displayMssg_t recDdisplayMssg;
 	char line[33];
-//	int timeOut = 0;
 
 	ESP_LOGI(TAG, "started\n\n");
 
