@@ -30,6 +30,7 @@
 #include "udpClient.h"
 #include "guiTask.h"
 #include "cgiScripts.h"
+#include "wifiConnect.h"
 
 static const char *TAG = "sensorTask";
 
@@ -272,7 +273,10 @@ void sensorTask(void *pvParameter) {
 
 			printf(" CO2: %d ppm", CO2value);
 			sprintf( str, "2:%d",CO2value);
-			UDPsendMssg(UDPTXPORT, str , strlen(str));
+			if (connectStatus == IP_RECEIVED) {
+				UDPsendMssg(UDPTXPORT, str , strlen(str));
+			}
+
 		} else {
 			printf(" Error reading CO2 ");
 			//measValues.CO2value = 9999;

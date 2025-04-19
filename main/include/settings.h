@@ -14,7 +14,7 @@
 #include <sys/time.h>
 
 typedef enum { FLT, STR, INT , DESCR , CALVAL} varType_t;
-#define MAX_STRLEN 32
+#define MAX_STRLEN 16
 
 #define USERSETTINGS_CHECKSTR 	"CO2TH"
 

@@ -50,7 +50,7 @@ extern bool DHCPoff;
 extern bool DNSoff;
 extern bool fileServerOff;
 
-typedef enum { CONNECTING, CONNECTED, SMARTCONFIG_ACTIVE , IP_RECEIVED} connectStatus_t;
+typedef enum { CONNECTING, CONNECTED, SMARTCONFIG_ACTIVE , WPS_ACTIVE,  IP_RECEIVED} connectStatus_t;
 
 extern volatile  connectStatus_t connectStatus;
 
