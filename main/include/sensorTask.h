@@ -32,6 +32,11 @@ int saveSettingsScript (char *pBuffer, int count);
 int cancelSettingsScript (char *pBuffer, int count);
 int calibrateRespScript(char *pBuffer, int count);
 int getSensorNameScript (char *pBuffer, int count);
+int enableAutCalScript (char *pBuffer, int count);
+int disableAutCalScript (char *pBuffer, int count);
+int clearLogScript (char *pBuffer, int count);
+
+
 void parseCGIWriteData(char *buf, int received);
 
 #endif /* MAIN_SENSOR_H_ */

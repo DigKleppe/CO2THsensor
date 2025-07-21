@@ -30,7 +30,7 @@ const tCGI *g_pCGIs;
 int g_iNumCGIs;
 extern bool settingsChanged;
 
-#define NUM_CGIurls 10
+#define NUM_CGIurls 12
 
 // http:/192.168.2.7///cgi-bin/getLogMeasValues
 
@@ -70,6 +70,9 @@ static const tCGI CGIurls[NUM_CGIurls] = {
 		{ "/cgi-bin/getSensorName", (tCGIHandler_t) readCGIvalues, (CGIresponseFileHandler_t) getSensorNameScript},
 		{ "/cgi-bin/saveSettings", (tCGIHandler_t) readCGIvalues, (CGIresponseFileHandler_t) saveSettingsScript},
 		{ "/cgi-bin/cancelSettings", (tCGIHandler_t) readCGIvalues, (CGIresponseFileHandler_t) cancelSettingsScript},
+		{ "/cgi-bin/enableAutCal", (tCGIHandler_t) readCGIvalues, (CGIresponseFileHandler_t) enableAutCalScript},
+		{ "/cgi-bin/disableAutCal", (tCGIHandler_t) readCGIvalues, (CGIresponseFileHandler_t) disableAutCalScript},
+		{ "/cgi-bin/clearLog", (tCGIHandler_t) readCGIvalues, (CGIresponseFileHandler_t) clearLogScript},
 };
 
 static const CGIdesc_t CGIdescriptors[] = {

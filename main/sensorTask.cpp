@@ -90,6 +90,7 @@ static int logRxIdx;
 extern int scriptState;
 static float lastTemperature;
 static float lastRH;
+static bool enableAutCal;
 
 static esp_err_t readC02(i2c_port_t i2c_num, int *pValue) {
 	esp_err_t ret = -1;
@@ -292,9 +293,12 @@ void sensorTask(void *pvParameter) {
 					//	sprintf(str, "%s,%2.0f,%2.2f,%3.1f,%d", userSettings.moduleName, lastVal.co2, lastVal.temperature, lastVal.hum, rssi);
 
 		int rssi = getRssi();				
-		sprintf(str, "S0,%d,%2.2f,%3.1f,%d", CO2value, temperature ,humidity, rssi);
+		sprintf(str, "S0,%d,%2.2f,%3.1f,%d\n\r", CO2value, temperature ,humidity, rssi);
 		UDPsendMssg(UDPTXPORT, str, strlen(str));
-		UDPsendMssg(UDPCALTXPORT, str, strlen(str));
+		if( enableAutCal) {
+			vTaskDelay(10);
+			UDPsendMssg(UDPCALTXPORT, str, strlen(str));
+		}
 				
 		printf(" CO2: %d ppm", CO2value);
 		sprintf(str, "2:%d", CO2value);
@@ -484,6 +488,48 @@ int cancelSettingsScript(char *pBuffer, int count) {
 	loadSettings();
 	return 0;
 }
+
+int enableAutCalScript (char *pBuffer, int count) {
+	switch (scriptState) {
+	case 0:
+		scriptState++;
+		strcpy(pBuffer, "OK");
+		enableAutCal = true;
+		return 3;
+		break;
+	default:
+		break;
+	}
+	return 0;
+}
+int disableAutCalScript (char *pBuffer, int count) {
+	switch (scriptState) {
+	case 0:
+		scriptState++;
+		strcpy(pBuffer, "OK");
+		enableAutCal = false;
+		return 3;
+		break;
+	default:
+		break;
+	}
+	return 0;
+}
+
+
+int clearLogScript(char *pBuffer, int count) {
+	if (scriptState == 0) { // find oldest value in cyclic logbuffer
+		logRxIdx = 0;
+		logTxIdx = 0;
+		memset(&tLog, 0, sizeof( tLog));
+		strcpy(pBuffer, "OK");
+		scriptState++;
+		return 3;
+	}
+	return 0;
+}
+
+
 
 // "setCal:Temperatuur=23"
 

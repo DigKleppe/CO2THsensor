@@ -1,7 +1,7 @@
 
 <html>
 <head>
-<!-- <link rel="stylesheet" type="text/css" href="styles.css"> -->
+<link rel="stylesheet" type="text/css" href="styles.css">
 <script type="text/javascript"
 	src="https://www.gstatic.com/charts/loader.js"></script>
 
@@ -24,16 +24,20 @@
 	</tr>
 	<tr>
 		<td><div id="temperatuur"
-				style="width: 100px; height: 40px; font-size: 20pt"></div></td>
+				style="width: 100px; height: 30px; font-size: 20pt"></div></td>
 		<td><div id="vochtigheid"
-				style="width: 100px; height: 40px; font-size: 20pt"></div></td>
+				style="width: 100px; height: 30px; font-size: 20pt"></div></td>
 		<td><div id="CO2"
-				style="width: 100px; height: 40px; font-size: 20pt";></div></td>
+				style="width: 100px; height: 30px; font-size: 20pt";></div></td>
 </table>
 
 <body>
-	<div id="tRHchart" style="width: 900px; height: 500px"></div>
-	<div id="CO2chart" style="width: 900px; height: 500px"></div>
+	<div id="tRHchart" style="width: 100%; height: 800px"></div>
+	<div id="CO2chart" style="width: 100%; height: 800px"></div>
+	<button class="button-3" onclick="clearLog()">log wissen</button>
+	<button class="button-3" onclick="clearChart()">grafiek wissen</button>
+	<input type="checkbox" id="autoCalCB" value="yes">
+    <label for="EnableAutoCal">AutoCalibratie</label><br>
 </body>
 	<a href="settings.html">Instellingen</a>
 

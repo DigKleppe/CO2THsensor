@@ -3,8 +3,6 @@
 */
 var CO2Data;
 var tempAndRHdata;
-
-
 var chartRdy = false;
 var tick = 0;
 var dontDraw = false;
@@ -117,6 +115,16 @@ function initChart() {
 	tempAndRHdata.addColumn('string', 'Time');
 	tempAndRHdata.addColumn('number', 't');
 	tempAndRHdata.addColumn('number', 'RH');
+
+	var cb = document.getElementById('autoCalCB');
+	cb.addEventListener('click', function (evt) {
+			if (this.checked) {
+				getItem("enableAutCal")
+			}
+			else { 
+				getItem("disableAutCal")
+			}
+		});
 
 	chartRdy = true;
 	dontDraw = false;
@@ -314,6 +322,15 @@ function timer() {
 	}
 }
 
+function clearChart() {
+	tempAndRHdata.removeRows(0, tempAndRHdata.getNumberOfRows());
+	CO2Data.removeRows(0, CO2Data.getNumberOfRows());
+	tRHchart.draw(tempAndRHdata, tempAndRHoptions);
+	CO2chart.draw(CO2Data, CO2Options);
+}
 
-
+function clearLog() {
+	sendItem("clearLog");
+	clearChart();
+}
 
