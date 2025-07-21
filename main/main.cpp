@@ -10,9 +10,7 @@
 #include "driver/gpio.h"
 #include "wifiConnect.h"
 #include "settings.h"
-#include "updateTask.h"
 #include "guiTask.h"
-
 
 #include <esp_err.h>
 
@@ -123,7 +121,6 @@ extern "C" void app_main(void) {
 				sprintf(line, "%s", myIpAddress);
 				xQueueSend(displayMssgBox, &recDdisplayMssg, 0);
 				xQueueReceive(displayReadyMssgBox, &recDdisplayMssg, portMAX_DELAY);
-				xTaskCreate(&updateTask, "updateTask", 2 * 8192, NULL, 5, NULL);
 				break;
 
 				default:

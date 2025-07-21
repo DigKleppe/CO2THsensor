@@ -1,12 +1,8 @@
+/*
+handles wifi connect process
 
-/* WiFi station Example
+*/
 
- This example code is in the Public Domain (or CC0 licensed, at your option.)
-
- Unless required by applicable law or agreed to in writing, this
- software is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
- CONDITIONS OF ANY KIND, either express or implied.
- */
 #include "esp_event.h"
 #include "esp_log.h"
 #include "esp_system.h"
@@ -24,9 +20,12 @@
 #include "mdns.h"
 #include "settings.h"
 
+
 #include "esp_smartconfig.h"
 #include "wifiConnect.h"
-
+#ifndef CONFIG_FIXED_LAST_IP_DIGIT
+#define CONFIG_FIXED_LAST_IP_DIGIT 99 // ip will be xx.xx.xx.pp    xx from DHCP  , <= 0 disables this
+#endif
 
 /*set wps mode via project configuration */
 #if CONFIG_EXAMPLE_WPS_TYPE_PBC
@@ -52,12 +51,14 @@ static int s_ap_creds_num = 0;
 static int s_retry_num = 0;
 void initialiseMdns(char *hostName);
 esp_err_t start_file_server(const char *base_path);
+//extern const tCGI CGIurls[];
 
 char myIpAddress[16];
 bool DHCPoff;
 bool IP6off;
 bool DNSoff;
 bool fileServerOff;
+bool fixedLastIPdigit = true;
 
 bool doStop;
 esp_netif_t *s_sta_netif = NULL;
@@ -65,6 +66,7 @@ volatile connectStatus_t connectStatus;
 
 static void setStaticIp(esp_netif_t *netif);
 esp_err_t saveSettings(void);
+
 
 #define EXAMPLE_ESP_WIFI_SSID "xxx"
 #define EXAMPLE_ESP_WIFI_PASS "yyy"
@@ -74,7 +76,7 @@ wifiSettings_t wifiSettings;
 // CONFIG_EXAMPLE_WIFI_PASSWORD,ipaddr_addr(DEFAULT_IPADDRESS),ipaddr_addr(DEFAULT_GW),CONFIG_DEFAULT_FIRMWARE_UPGRADE_URL,CONFIG_FIRMWARE_UPGRADE_FILENAME,false
 // };
 wifiSettings_t wifiSettingsDefaults = {
-	CONFIG_EXAMPLE_WIFI_SSID, CONFIG_EXAMPLE_WIFI_PASSWORD, ipaddr_addr(DEFAULT_IPADDRESS), ipaddr_addr(DEFAULT_GW), " ", " ", false};
+	CONFIG_EXAMPLE_WIFI_SSID, CONFIG_EXAMPLE_WIFI_PASSWORD, ipaddr_addr(DEFAULT_IPADDRESS), ipaddr_addr(DEFAULT_GW), " ", " ", " ", "0.0", false};
 
 /* The examples use WiFi configuration that you can set via project configuration menu
 
@@ -83,7 +85,6 @@ wifiSettings_t wifiSettingsDefaults = {
  */
 
 #define EXAMPLE_ESP_MAXIMUM_RETRY 2
-#define EXAMPLE_H2E_IDENTIFIER ""
 #define CONFIG_ESP_WPA3_SAE_PWE_BOTH 1
 #define ESP_WIFI_SAE_MODE WPA3_SAE_PWE_BOTH
 #define CONFIG_ESP_WIFI_PW_ID ""
@@ -131,10 +132,19 @@ static const int ESPTOUCH_DONE_BIT = BIT2;
 
 static const char *TAG = "wifiConnect";
 
+int getRssi(void) {
+	wifi_ap_record_t ap_info;
+	if (esp_wifi_sta_get_ap_info(&ap_info) == ESP_OK) {
+		return ap_info.rssi;
+	} else {
+		ESP_LOGE(TAG, "Failed to get AP info");
+		return 0;
+	}
+}
+
 static void setStaticIp(esp_netif_t *netif) {
 	if (esp_netif_dhcpc_stop(netif) != ESP_OK) {
-		ESP_LOGE(TAG, "Failed to stop dhcp client");
-		return;
+		//	ESP_LOGE(TAG, "Failed to stop dhcp client");
 	}
 	esp_netif_ip_info_t ip;
 	memset(&ip, 0, sizeof(esp_netif_ip_info_t));
@@ -166,13 +176,8 @@ static bool wpsActive = false;
 static TimerHandle_t wpsTimer;
 void wpsTimerCallback(TimerHandle_t xTimer) {
 	ESP_LOGI(TAG, "WPS Timeout");
-	ESP_ERROR_CHECK(esp_wifi_wps_disable());
-
-	connectStatus = CONNECTING;
-	s_retry_num = 0;
-	esp_wifi_connect();
-	xTimerDelete(wpsTimer, 0);
-	wpsTimer = NULL;
+	if (connectStatus == WPS_ACTIVE)
+		connectStatus = WPS_TIMEOUT;
 }
 // for timeout, without this timer the timeout is 120s
 void startWpsTimer(void) {
@@ -231,51 +236,28 @@ static void event_handler(void *arg, esp_event_base_t event_base, int32_t event_
 				esp_wifi_connect();
 				s_retry_num++;
 			} else {
-#ifdef CONFIG_WPS_ENABLED
-				if (connectStatus != WPS_ACTIVE) {
-					connectStatus = WPS_ACTIVE;
-					ESP_LOGI(TAG, "WPS Active");
-					ESP_ERROR_CHECK(esp_wifi_wps_disable());
-					ESP_ERROR_CHECK(esp_wifi_wps_enable(&wpsConfig));
-					ESP_ERROR_CHECK(esp_wifi_wps_start(0));
-					wpsActive = true;
-					startWpsTimer();
-				} else {
-					if (ap_idx < s_ap_creds_num) {
-						/* Try the next AP credential if first one fails */
-						if (ap_idx < s_ap_creds_num) {
-							ESP_LOGI(TAG, "Connecting to SSID: %s, Passphrase: %s", wps_ap_creds[ap_idx].sta.ssid, wps_ap_creds[ap_idx].sta.password);
-							ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &wps_ap_creds[ap_idx++]));
-							esp_wifi_connect();
-						}
-					} else {
-						ESP_LOGI(TAG, "Failed to connect!");
-						connectStatus = CONNECTING;
-					}
-				}
-#else
-#ifdef CONFIG_SMARTCONFIG_ENABLED
-				xTaskCreate(smartconfigTask, "smartconfig_task", 4096, NULL, 3, NULL);
-				connectStatus = SMARTCONFIG_ACTIVE;
-				ESP_LOGI(TAG, "Starting SmartConfig");
-#endif
-#endif
+				connectStatus = CONNECT_TIMEOUT;
 				s_retry_num = 0;
 			}
 			break;
+#ifdef CONFIG_SMARTCONFIG_ENABLED
+			xTaskCreate(smartconfigTask, "smartconfig_task", 4096, NULL, 3, NULL);
+			connectStatus = SMARTCONFIG_ACTIVE;
+			ESP_LOGI(TAG, "Starting SmartConfig");
+#endif
+
+			// 	s_retry_num = 0;
+			// }
+			// break;
 #ifdef CONFIG_WPS_ENABLED
 
 		case WIFI_EVENT_STA_WPS_ER_SUCCESS: {
+			connectStatus = WPS_SUCCESS;
 			ESP_LOGI(TAG, "WIFI_EVENT_STA_WPS_ER_SUCCESS");
 			{
 				wifi_event_sta_wps_er_success_t *evt = (wifi_event_sta_wps_er_success_t *)event_data;
 				int i;
-				if (wpsTimer != NULL) {
-					xTimerDelete(wpsTimer, 0);
-					wpsTimer = NULL;
-				}
 				if (evt) { // never seen this ??
-
 					s_ap_creds_num = evt->ap_cred_cnt;
 					for (i = 0; i < s_ap_creds_num; i++) {
 						memcpy(wps_ap_creds[i].sta.ssid, evt->ap_cred[i].ssid, sizeof(evt->ap_cred[i].ssid));
@@ -284,38 +266,24 @@ static void event_handler(void *arg, esp_event_base_t event_base, int32_t event_
 					/* If multiple AP credentials are received from WPS, connect with first one */
 					ESP_LOGI(TAG, "Connecting to SSID: %s, Passphrase: %s", wps_ap_creds[0].sta.ssid, wps_ap_creds[0].sta.password);
 					ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &wps_ap_creds[0]));
-					connectStatus = CONNECTED;
+					//		connectStatus = CONNECTED;
 				}
 				/*
 				 * If only one AP credential is received from WPS, there will be no event data and
 				 * esp_wifi_set_config() is already called by WPS modules for backward compatibility
 				 * with legacy apps. So directly attempt connection here.
 				 */
-				ESP_ERROR_CHECK(esp_wifi_wps_disable());
-				esp_wifi_connect();
+				//	ESP_ERROR_CHECK(esp_wifi_wps_disable());
+				//  esp_wifi_connect();
 			}
 		} break;
 		case WIFI_EVENT_STA_WPS_ER_FAILED:
+			connectStatus = WPS_FAILED;
 			ESP_LOGI(TAG, "WIFI_EVENT_STA_WPS_ER_FAILED");
-			ESP_ERROR_CHECK(esp_wifi_wps_disable());
-			connectStatus = CONNECTING;
-			if (wpsTimer != NULL) {
-				xTimerDelete(wpsTimer, 0);
-				wpsTimer = NULL;
-			}
-			s_retry_num = 0;
-			esp_wifi_connect();
 			break;
 		case WIFI_EVENT_STA_WPS_ER_TIMEOUT:
+			connectStatus = WPS_TIMEOUT;
 			ESP_LOGI(TAG, "WIFI_EVENT_STA_WPS_ER_TIMEOUT");
-			ESP_ERROR_CHECK(esp_wifi_wps_disable());
-			connectStatus = CONNECTING;
-			s_retry_num = 0;
-			esp_wifi_connect();
-			if (wpsTimer != NULL) {
-				xTimerDelete(wpsTimer, 0);
-				wpsTimer = NULL;
-			}
 			break;
 		case WIFI_EVENT_STA_WPS_ER_PIN: {
 			ESP_LOGI(TAG, "WIFI_EVENT_STA_WPS_ER_PIN");
@@ -334,32 +302,35 @@ static void event_handler(void *arg, esp_event_base_t event_base, int32_t event_
 		ESP_LOGI(TAG, "IP_EVENT %d", (int)event_id);
 		switch (event_id) {
 		case IP_EVENT_STA_GOT_IP: {
-#ifdef CONFIG_WPS_ENABLED
-
-			if (wpsTimer != NULL) {
-				xTimerDelete(wpsTimer, 0);
-				wpsTimer = NULL;
-			}
-			if (wpsActive) { // else this is set in WPS_EVENT_STA_WPS_ER_SUCCESS
-				wifi_config_t config;
-				esp_err_t err = esp_wifi_get_config(WIFI_IF_STA, &config);
-				if (err == ESP_OK) {
-					ESP_LOGI(TAG, "WPS: SSID: %s, PW: %s\n", (char *)config.sta.ssid, (char *)config.sta.password);
-					memcpy((char *)wifiSettings.SSID, (char *)config.sta.ssid, sizeof(wifiSettings.SSID));
-					memcpy((char *)wifiSettings.pwd, (char *)config.sta.password, sizeof(wifiSettings.pwd));
-					saveSettings();
-				} else {
-					printf("Couldn't get config: %d\n", (int)err);
-				}
-				wpsActive = false;
-			}
-#endif
-			xEventGroupSetBits(s_wifi_event_group, CONNECTED_BIT);
 			ip_event_got_ip_t *event = (ip_event_got_ip_t *)event_data;
 			sprintf(myIpAddress, IPSTR, IP2STR(&event->ip_info.ip));
-			connectStatus = IP_RECEIVED;
-		}
-		break;
+
+			if (CONFIG_FIXED_LAST_IP_DIGIT > 0) { // check if the last digit of IP address = CONFIG_FIXED_LAST_IP_DIGIT
+				uint32_t addr = event->ip_info.ip.addr;
+
+				if ((addr & 0xFF000000) == (CONFIG_FIXED_LAST_IP_DIGIT << 24)) { // last ip digit(LSB) is MSB in addr
+					xEventGroupSetBits(s_wifi_event_group, CONNECTED_BIT);		 // ok
+					connectStatus = IP_RECEIVED;
+				} else {
+					wifiSettings.ip4Address = (esp_ip4_addr_t)((addr & 0x00FFFFFF) + (CONFIG_FIXED_LAST_IP_DIGIT << 24));
+					sprintf(myIpAddress, IPSTR, IP2STR(&wifiSettings.ip4Address));
+					saveSettings();
+					ESP_LOGI(TAG, "Set static IP to %s , reconnecting", (myIpAddress));
+					setStaticIp(s_sta_netif);
+					esp_wifi_disconnect();
+					esp_wifi_connect();
+					// if (!DNSoff)
+					// 	initialiseMdns(userSettings.moduleName);
+				}
+			}
+
+			else {
+				connectStatus = IP_RECEIVED;
+				xEventGroupSetBits(s_wifi_event_group, CONNECTED_BIT);
+				// if (!DNSoff)
+				// 	initialiseMdns(userSettings.moduleName);
+			}
+		} break;
 		default:
 			break;
 		}
@@ -435,13 +406,12 @@ void wifi_init_sta(void) {
 
 	ESP_ERROR_CHECK(esp_netif_init());
 
-	if (!DNSoff)
-		initialiseMdns(userSettings.moduleName);
-
 	//	ESP_ERROR_CHECK(esp_event_loop_create_default());  in main
 	s_sta_netif = esp_netif_create_default_wifi_sta();
 	if (DHCPoff)
 		setStaticIp((esp_netif_t *)s_sta_netif);
+
+	esp_netif_set_hostname(s_sta_netif, userSettings.moduleName);
 
 	wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
 	ESP_ERROR_CHECK(esp_wifi_init(&cfg));
@@ -451,24 +421,10 @@ void wifi_init_sta(void) {
 	ESP_ERROR_CHECK(esp_event_handler_instance_register(WIFI_EVENT, ESP_EVENT_ANY_ID, &event_handler, NULL, &instance_any_id));
 	ESP_ERROR_CHECK(esp_event_handler_instance_register(IP_EVENT, IP_EVENT_STA_GOT_IP, &event_handler, NULL, &instance_got_ip));
 
+#ifdef CONFIG_SMARTCONFIG_ENABLED
 	ESP_ERROR_CHECK(esp_event_handler_register(SC_EVENT, ESP_EVENT_ANY_ID, &event_handler, NULL));
-
-	wifi_config_t wifi_config = {
-		.sta =
-			{
-				.ssid = EXAMPLE_ESP_WIFI_SSID, .password = EXAMPLE_ESP_WIFI_PASS,
-
-				/* Authmode threshold resets to WPA2 as default if password matches WPA2 standards (pasword len => 8).
-				 * If you want to connect the device to deprecated WEP/WPA networks, Please set the threshold value
-				 * to WIFI_AUTH_WEP/WIFI_AUTH_WPA_PSK and set the password with length and format matching to
-				 * WIFI_AUTH_WEP/WIFI_AUTH_WPA_PSK standards.
-				 */
-				//	.threshold.authmode = ESP_WIFI_SCAN_AUTH_MODE_THRESHOLD,
-				//	.sae_pwe_h2e = ESP_WIFI_SAE_MODE,
-				//	.sae_h2e_identifier = EXAMPLE_H2E_IDENTIFIER,
-			},
-	};
-
+#endif
+	wifi_config_t wifi_config = {0};
 	wifi_config.sta.threshold.authmode = ESP_WIFI_SCAN_AUTH_MODE_THRESHOLD;
 	wifi_config.sta.sae_pwe_h2e = ESP_WIFI_SAE_MODE;
 	strcpy((char *)wifi_config.sta.sae_h2e_identifier, EXAMPLE_H2E_IDENTIFIER);
@@ -479,9 +435,6 @@ void wifi_init_sta(void) {
 	ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
 	ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &wifi_config));
 	ESP_ERROR_CHECK(esp_wifi_start());
-
-	ESP_ERROR_CHECK(start_file_server("/spiffs"));
-
 	ESP_LOGI(TAG, "wifi_init_sta finished.");
 }
 
@@ -505,7 +458,99 @@ void wifi_stop(void) {
 	s_sta_netif = NULL;
 }
 
+void connectTask(void *pvParameters) {
+	int step = 0;
+	while (1) {
+		switch (step) {
+		case 0:
+			ESP_LOGI(TAG, "Connecting to: %s pw:%s", wifiSettings.SSID, wifiSettings.pwd);
+			wifi_init_sta();
+			ESP_ERROR_CHECK(start_file_server("/spiffs"));
+			step++;
+			break;
+		case 1:
+			switch (connectStatus) {
+			case CONNECTED:
+			case IP_RECEIVED:
+				step = 20;
+				break;
+			case CONNECT_TIMEOUT:
+#ifdef CONFIG_WPS_ENABLED
+				step++;
+				connectStatus = WPS_ACTIVE;
+				ESP_LOGI(TAG, "WPS Active");
+				ESP_ERROR_CHECK(esp_wifi_wps_enable(&wpsConfig));
+				ESP_ERROR_CHECK(esp_wifi_wps_start(0));
+				wpsActive = true;
+				startWpsTimer();
+				break;
+			default:
+				break;
+			};
+			break;
+		case 2: // get results from WPS
+			switch (connectStatus) {
+			case WPS_SUCCESS: {
+				xTimerDelete(wpsTimer, 0);
+				ESP_ERROR_CHECK(esp_wifi_wps_disable());
+
+				wifi_config_t config;
+				esp_err_t err = esp_wifi_get_config(WIFI_IF_STA, &config);
+				if (err == ESP_OK) {
+					ESP_LOGI(TAG, "WPS: SSID: %s, PW: %s\n", (char *)config.sta.ssid, (char *)config.sta.password);
+					memcpy((char *)wifiSettings.SSID, (char *)config.sta.ssid, sizeof(wifiSettings.SSID));
+					memcpy((char *)wifiSettings.pwd, (char *)config.sta.password, sizeof(wifiSettings.pwd));
+					saveSettings();
+				} else {
+					printf("Couldn't get config: %d\n", (int)err);
+				}
+
+				esp_wifi_connect();
+				step = 20;
+			} break;
+			case WPS_FAILED:
+			case WPS_TIMEOUT: {
+				ESP_ERROR_CHECK(esp_wifi_wps_disable());
+				xTimerDelete(wpsTimer, 0);
+				s_retry_num = 0;
+				esp_wifi_connect();
+				connectStatus = CONNECTING;
+				step = 1;
+			}
+			break;
+
+			default:
+				break;
+			}
+			break;
+#endif
+		case 20:
+			switch (connectStatus) {
+			case IP_RECEIVED:
+				if (!DNSoff)
+					initialiseMdns(userSettings.moduleName);
+
+				step = 30;
+				break;
+			default:
+				break;
+			}
+			break;
+
+		case 30:
+			if ( connectStatus != IP_RECEIVED)
+				step = 1;
+			break;
+
+		default:
+			break;
+		}
+
+		vTaskDelay(10);
+	}
+}
+
 void wifiConnect(void) {
-	wifi_init_sta();
-//	g_pCGIs = CGIurls; // for file_server to read CGIurls
+	xTaskCreate(connectTask, "connectTask", configMINIMAL_STACK_SIZE * 5, NULL, 5, NULL);
+///	g_pCGIs = CGIurls; // for file_server to read CGIurls
 }

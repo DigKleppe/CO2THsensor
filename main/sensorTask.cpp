@@ -5,72 +5,73 @@
  *      Author: dig
  */
 
-//#define SIMULATE
-//#define FAST
+// #define SIMULATE
+// #define FAST
 
 #include "freertos/FreeRTOS.h"
+#include "freertos/event_groups.h"
 #include "freertos/portmacro.h"
 #include "freertos/queue.h"
-#include "freertos/event_groups.h"
 
 #include "driver/gpio.h"
-#include "settings.h"
 #include "driver/gptimer.h"
 #include "driver/i2c.h"
 #include "esp_log.h"
+#include "settings.h"
 
-#include <stdio.h>
-#include <time.h>
-#include <sys/time.h>
 #include <math.h>
+#include <stdio.h>
 #include <string.h>
+#include <sys/time.h>
+#include <time.h>
 
-#include "sensorTask.h"
-#include "Dht22.h"
-#include "udpClient.h"
-#include "guiTask.h"
 #include "cgiScripts.h"
+#include "guiTask.h"
+#include "sensorTask.h"
+#include "sht4x.h"
+#include "udpClient.h"
 #include "wifiConnect.h"
 
 static const char *TAG = "sensorTask";
 
-#define TIMER_DIVIDER         16  //  Hardware timer clock divider 80Mhz
-#define TIMER_SCALE           (TIMER_BASE_CLK / TIMER_DIVIDER)  // convert counter value to seconds
-#define TIMERIDX			  0  // timer 0 group 0 used
+#define TIMER_DIVIDER 16							 //  Hardware timer clock divider 80Mhz
+#define TIMER_SCALE (TIMER_BASE_CLK / TIMER_DIVIDER) // convert counter value to seconds
+#define TIMERIDX 0									 // timer 0 group 0 used
 
-#define SAMPLEPERIOD		   10 // seconds
+#define SAMPLEPERIOD 10 // seconds
 
-Averager temperatureHourBuffer(60/SAMPLEPERIOD);  // todo make minute
-Averager humidityHourBuffer(60/SAMPLEPERIOD);
-Averager CO2HourBuffer(60/SAMPLEPERIOD);
+Averager temperatureHourBuffer(60 / SAMPLEPERIOD); // todo make minute
+Averager humidityHourBuffer(60 / SAMPLEPERIOD);
+Averager CO2HourBuffer(60 / SAMPLEPERIOD);
 
 time_t now;
 struct tm timeinfo;
 
-#define I2C_EXAMPLE_MASTER_SCL_IO          19               /*!< gpio number for I2C master clock */
-#define I2C_EXAMPLE_MASTER_SDA_IO          18               /*!< gpio number for I2C master data  */
-#define I2C_MASTER_NUM             I2C_NUM_1        /*!< I2C port number for master dev */
-#define I2C_EXAMPLE_MASTER_TX_BUF_DISABLE  0                /*!< I2C master do not need buffer */
-#define I2C_EXAMPLE_MASTER_RX_BUF_DISABLE  0                /*!< I2C master do not need buffer */
-#define I2C_EXAMPLE_MASTER_FREQ_HZ         100000           /*!< I2C master clock frequency */
+#define I2C_EXAMPLE_MASTER_SCL_IO 19		/*!< gpio number for I2C master clock */
+#define I2C_EXAMPLE_MASTER_SDA_IO 18		/*!< gpio number for I2C master data  */
+#define I2C_MASTER_NUM I2C_NUM_1			/*!< I2C port number for master dev */
+#define I2C_EXAMPLE_MASTER_TX_BUF_DISABLE 0 /*!< I2C master do not need buffer */
+#define I2C_EXAMPLE_MASTER_RX_BUF_DISABLE 0 /*!< I2C master do not need buffer */
+#define I2C_EXAMPLE_MASTER_FREQ_HZ 100000	/*!< I2C master clock frequency */
 
-#define CO2_SENSOR_ADDR    		           0x68             /*!< slave address for BH1750 sensor */
-#define WRITE_BIT                          I2C_MASTER_WRITE /*!< I2C master write */
-#define READ_BIT                           I2C_MASTER_READ  /*!< I2C master read */
-#define ACK_CHECK_EN                       0x1              /*!< I2C master will check ack from slave*/
-#define ACK_CHECK_DIS                      0x0              /*!< I2C master will not check ack from slave */
-#define ACK_VAL                           (i2c_ack_type_t) 0x0             /*!< I2C ack value */
-#define NACK_VAL                          (i2c_ack_type_t) 0x1              /*!< I2C nack value */
+#define CO2_SENSOR_ADDR 0x68		 /*!< slave address for BH1750 sensor */
+#define WRITE_BIT I2C_MASTER_WRITE	 /*!< I2C master write */
+#define READ_BIT I2C_MASTER_READ	 /*!< I2C master read */
+#define ACK_CHECK_EN 0x1			 /*!< I2C master will check ack from slave*/
+#define ACK_CHECK_DIS 0x0			 /*!< I2C master will not check ack from slave */
+#define ACK_VAL (i2c_ack_type_t)0x0	 /*!< I2C ack value */
+#define NACK_VAL (i2c_ack_type_t)0x1 /*!< I2C nack value */
 
-#define DHT_GPIO							GPIO_NUM_25
+#define DHT_GPIO GPIO_NUM_25
 
 static esp_err_t readC02(i2c_port_t i2c_num, int *pValue);
 static void i2c_master_init();
 
-#define LOGINTERVAL			 	60  // seconds
-#define MEASUREINTERVAL			1	//
-#define MAXLOGVALUES			(24*60)
-#define UDPTXPORT				5001
+#define LOGINTERVAL 60	  // seconds
+#define MEASUREINTERVAL 1 //
+#define MAXLOGVALUES (24 * 60)
+#define UDPTXPORT 5050
+#define UDPCALTXPORT 5051
 
 typedef struct {
 	int32_t timeStamp;
@@ -79,7 +80,7 @@ typedef struct {
 	int32_t co2;
 } log_t;
 
-static log_t tLog[ MAXLOGVALUES];
+static log_t tLog[MAXLOGVALUES];
 static log_t lastVal;
 static int timeStamp = 1;
 
@@ -132,7 +133,7 @@ static esp_err_t readC02(i2c_port_t i2c_num, int *pValue) {
 		printf("\n CO2 err 1 ");
 	if (ret == ESP_OK)
 		ok = true;
-//	}
+	//	}
 	if (!ok)
 		return ret;
 
@@ -141,8 +142,8 @@ static esp_err_t readC02(i2c_port_t i2c_num, int *pValue) {
 	value = value << 8;
 	value |= buffer[2] & 0xFF;
 
-	uint8_t sum = 0; //Checksum Byte
-	sum = buffer[0] + buffer[1] + buffer[2]; //Byte addition utilizes overflow
+	uint8_t sum = 0;						 // Checksum Byte
+	sum = buffer[0] + buffer[1] + buffer[2]; // Byte addition utilizes overflow
 
 	if (sum == buffer[3]) {
 		*pValue = value;
@@ -156,9 +157,9 @@ static esp_err_t readC02(i2c_port_t i2c_num, int *pValue) {
  * @brief i2c master initialization
  */
 static void i2c_master_init() {
-	i2c_port_t  i2c_master_port = I2C_MASTER_NUM;
+	i2c_port_t i2c_master_port = I2C_MASTER_NUM;
 	i2c_config_t conf;
-	memset( &conf, 0, sizeof( conf));
+	memset(&conf, 0, sizeof(conf));
 	conf.mode = I2C_MODE_MASTER;
 	conf.sda_io_num = I2C_EXAMPLE_MASTER_SDA_IO;
 	conf.sda_pullup_en = GPIO_PULLUP_ENABLE;
@@ -167,9 +168,7 @@ static void i2c_master_init() {
 	conf.master.clk_speed = I2C_EXAMPLE_MASTER_FREQ_HZ;
 
 	i2c_param_config(i2c_master_port, &conf);
-	i2c_driver_install(i2c_master_port, conf.mode,
-	I2C_EXAMPLE_MASTER_RX_BUF_DISABLE,
-	I2C_EXAMPLE_MASTER_TX_BUF_DISABLE, 0);
+	i2c_driver_install(i2c_master_port, conf.mode, I2C_EXAMPLE_MASTER_RX_BUF_DISABLE, I2C_EXAMPLE_MASTER_TX_BUF_DISABLE, 0);
 }
 
 void sensorTask(void *pvParameter) {
@@ -182,8 +181,7 @@ void sensorTask(void *pvParameter) {
 #endif
 	char str[20];
 	log_t tempVal;
-	Dht22 dht22(DHT_GPIO);
-	Dht22::dht22Data_t dhtData;
+	int32_t iTemperature, iHumidity; // temperary
 
 	float temperature = 0, humidity = 0;
 	int CO2value = 0;
@@ -192,24 +190,38 @@ void sensorTask(void *pvParameter) {
 	int I2Ctimeout = 10;
 
 	bool minutePassed = false;
+	bool SHTpresent = false;
 
 	displayMssg_t recDdisplayMssg;
 	char line[33];
 	recDdisplayMssg.str1 = line;
 
 	i2c_master_init();
+	sensirion_i2c_init(I2C_MASTER_NUM);
+
+	uint32_t serial = 0;
+	int retries = 3;
+	do {
+		sht4x_read_serial(&serial);
+		retries--;
+	} while ((serial == 0) && (retries > 0));
+
+	if (retries) {
+		printf("\nSHT45 serial: %ld\n\r", serial);
+		SHTpresent = true;
+	} else
+		printf("\nSHT45 not found!");
 
 	xLastWakeTime = xTaskGetTickCount();
 
-
 #ifdef SIMULATE
-	for (n = 0; n < SAMPLESPERDAY ; n ++ ) {
+	for (n = 0; n < SAMPLESPERDAY; n++) {
 		temperature = 150 / 2 * (1 + sin(n / 10));
 		humidity = 150 / 2 * (1 + sin(n / 3));
 		CO2value = 250 / 2 * (1 + sin(n / 3));
-		temperatureHourBuffer.write( (uint16_t) temperature);
-		humidityHourBuffer.write( (uint16_t) humidity);
-		CO2HourBuffer.write( (uint16_t) CO2value);
+		temperatureHourBuffer.write((uint16_t)temperature);
+		humidityHourBuffer.write((uint16_t)humidity);
+		CO2HourBuffer.write((uint16_t)CO2value);
 	}
 	n = 0;
 #endif
@@ -224,96 +236,110 @@ void sensorTask(void *pvParameter) {
 		CO2value = 450 / 2 * (1 + sin(n / 3));
 		n++;
 #else
+		if (SHTpresent) {
+			err = sht4x_measure_blocking_read(&iTemperature, &iHumidity);
 
-		err = dht22.getData(&dhtData);
-		if (err == ESP_OK) {
-			temperature = dhtData.temperature;
-			humidity = dhtData.humidity;
-			lastTemperature = temperature;
-			lastRH= humidity;
-		}
+			if (err == ESP_OK) {
+				temperature = iTemperature / 1000.0f;
+				humidity = iHumidity / 1000.0f;
+				lastTemperature = temperature;
+				lastRH = humidity;
+			}
 #endif
-		humidityHourBuffer.write((uint16_t) (100.0 * humidity));  // use last values for graph
-		temperatureHourBuffer.write((uint16_t) (100.0 * temperature));
+		humidityHourBuffer.write((uint16_t)(100.0 * humidity)); // use last values for graph
+		temperatureHourBuffer.write((uint16_t)(100.0 * temperature));
+	}
+	else {
+		temperature = 999;
+		humidity = 999;
+		err = ESP_OK;
+	}
 
-		if (err == ESP_OK) {
-			I2Ctimeout = 10;
+	if (err == ESP_OK) {
+		I2Ctimeout = 10;
 
-			recDdisplayMssg.line = 1;
-			recDdisplayMssg.showTime = 0;
-			sprintf(line, "T  :%2.1f", temperature -userSettings.temperatureOffset);
-			xQueueSend(displayMssgBox, &recDdisplayMssg, 0);
-			xQueueReceive(displayReadyMssgBox, &recDdisplayMssg, portMAX_DELAY);
+		recDdisplayMssg.line = 1;
+		recDdisplayMssg.showTime = 0;
+		sprintf(line, "T  :%2.1f", temperature - userSettings.temperatureOffset);
+		xQueueSend(displayMssgBox, &recDdisplayMssg, 0);
+		xQueueReceive(displayReadyMssgBox, &recDdisplayMssg, portMAX_DELAY);
 
-			recDdisplayMssg.line = 2;
-			sprintf(line, "RH :%2.1f ", humidity -userSettings.RHOffset);
-			xQueueSend(displayMssgBox, &recDdisplayMssg, 0);
-			xQueueReceive(displayReadyMssgBox, &recDdisplayMssg, portMAX_DELAY);
+		recDdisplayMssg.line = 2;
+		sprintf(line, "RH :%2.1f ", humidity - userSettings.RHOffset);
+		xQueueSend(displayMssgBox, &recDdisplayMssg, 0);
+		xQueueReceive(displayReadyMssgBox, &recDdisplayMssg, portMAX_DELAY);
 
-			printf("\n temp: %2.2f , hum: %2.1f ", temperature, humidity);
-		} else {
+		printf("\n temp: %2.2f , hum: %2.1f ", temperature, humidity);
+	} else {
 		//	measValues.temperature = 9999;
 		//	measValues.humidity = 9999;
-			printf("\n error reading DHT: %x ", err);
-		}
+		printf("\n error reading DHT: %x ", err);
+	}
 #ifndef SIMULATE
-		err = readC02(I2C_NUM_1, &tempCO2value);
-		if ( err == ESP_OK)
-			CO2value = tempCO2value;
+	err = readC02(I2C_NUM_1, &tempCO2value);
+	if (err == ESP_OK)
+		CO2value = tempCO2value;
 #endif
-		if  ( CO2value > 300)
-			CO2HourBuffer.write(CO2value);
+	if (CO2value > 300)
+		CO2HourBuffer.write(CO2value);
 
-		if (err == ESP_OK) {
-			I2Ctimeout = 10;
-			recDdisplayMssg.line = 0;
-			sprintf(line, "CO2:%d", CO2value);
-			xQueueSend(displayMssgBox, &recDdisplayMssg, 0);
-			xQueueReceive(displayReadyMssgBox, &recDdisplayMssg, portMAX_DELAY);
+	if (err == ESP_OK) {
+		I2Ctimeout = 10;
+		recDdisplayMssg.line = 0;
+		sprintf(line, "CO2:%d", CO2value);
+		xQueueSend(displayMssgBox, &recDdisplayMssg, 0);
+		xQueueReceive(displayReadyMssgBox, &recDdisplayMssg, portMAX_DELAY);
+					//	sprintf(str, "%s,%2.0f,%2.2f,%3.1f,%d", userSettings.moduleName, lastVal.co2, lastVal.temperature, lastVal.hum, rssi);
 
-			printf(" CO2: %d ppm", CO2value);
-			sprintf( str, "2:%d",CO2value);
-			if (connectStatus == IP_RECEIVED) {
-				UDPsendMssg(UDPTXPORT, str , strlen(str));
-			}
-
-		} else {
-			printf(" Error reading CO2 ");
-			//measValues.CO2value = 9999;
+		int rssi = getRssi();				
+		sprintf(str, "S0,%d,%2.2f,%3.1f,%d", CO2value, temperature ,humidity, rssi);
+		UDPsendMssg(UDPTXPORT, str, strlen(str));
+		UDPsendMssg(UDPCALTXPORT, str, strlen(str));
+				
+		printf(" CO2: %d ppm", CO2value);
+		sprintf(str, "2:%d", CO2value);
+		if (connectStatus == IP_RECEIVED) {
+			UDPsendMssg(UDPTXPORT, str, strlen(str));
 		}
-		time(&now);
-		localtime_r(&now, &timeinfo);
+
+
+
+	} else {
+		printf(" Error reading CO2 ");
+		// measValues.CO2value = 9999;
+	}
+	time(&now);
+	localtime_r(&now, &timeinfo);
 #ifdef FAST
-		if(1){
-			minutePassed = false;
+	if (1) {
+		minutePassed = false;
 #else
 		if (timeinfo.tm_sec < 10) {
 #endif
 
-			if (!minutePassed) {
-				minutePassed = true;
-				tempVal.co2  = CO2HourBuffer.average();
-				tempVal.temperature  = temperatureHourBuffer.average()/100.0;
-				tempVal.hum  = humidityHourBuffer.average()/100.0;
-				tempVal.timeStamp = timeStamp++;
-				lastVal = tempVal;
+		if (!minutePassed) {
+			minutePassed = true;
+			tempVal.co2 = CO2HourBuffer.average();
+			tempVal.temperature = temperatureHourBuffer.average() / 100.0;
+			tempVal.hum = humidityHourBuffer.average() / 100.0;
+			tempVal.timeStamp = timeStamp++;
+			lastVal = tempVal;
 
-				if (abs ( tempVal.temperature - lastVal.temperature) >= 4.0) { // spike error
-					tempVal.temperature = lastVal.temperature;
-					tempVal.hum = lastVal.hum;
-				}
-
-				tLog[logTxIdx] = tempVal;
-
-				logTxIdx++;
-				if (logTxIdx >= MAXLOGVALUES)
-					logTxIdx = 0;
+			if (abs(tempVal.temperature - lastVal.temperature) >= 4.0) { // spike error
+				tempVal.temperature = lastVal.temperature;
+				tempVal.hum = lastVal.hum;
 			}
-		} else
-			minutePassed = false;
-		I2Ctimeout--;
 
-	}
+			tLog[logTxIdx] = tempVal;
+
+			logTxIdx++;
+			if (logTxIdx >= MAXLOGVALUES)
+				logTxIdx = 0;
+		}
+	} else
+		minutePassed = false;
+	I2Ctimeout--;
+}
 }
 
 // called from CGI
@@ -325,8 +351,8 @@ int getRTMeasValuesScript(char *pBuffer, int count) {
 	case 0:
 		scriptState++;
 		len += sprintf(pBuffer + len, "%ld,", lastVal.timeStamp);
-		len += sprintf(pBuffer + len, "%3.2f,", lastVal.temperature -userSettings.temperatureOffset);
-		len += sprintf(pBuffer + len, "%3.2f,", lastVal.hum -userSettings.RHOffset);
+		len += sprintf(pBuffer + len, "%3.2f,", lastVal.temperature - userSettings.temperatureOffset);
+		len += sprintf(pBuffer + len, "%3.2f,", lastVal.hum - userSettings.RHOffset);
 		len += sprintf(pBuffer + len, "%ld,", lastVal.co2);
 		return len;
 		break;
@@ -341,11 +367,11 @@ int getRTMeasValuesScript(char *pBuffer, int count) {
 int getNewMeasValuesScript(char *pBuffer, int count) {
 
 	int left, len = 0;
-	if (logRxIdx != (logTxIdx)) {  // something to send?
+	if (logRxIdx != (logTxIdx)) { // something to send?
 		do {
 			len += sprintf(pBuffer + len, "%ld,", tLog[logRxIdx].timeStamp);
-			len += sprintf(pBuffer + len, "%3.2f,", tLog[logRxIdx].temperature -userSettings.temperatureOffset);
-			len += sprintf(pBuffer + len, "%3.2f,", tLog[logRxIdx].hum-userSettings.RHOffset);
+			len += sprintf(pBuffer + len, "%3.2f,", tLog[logRxIdx].temperature - userSettings.temperatureOffset);
+			len += sprintf(pBuffer + len, "%3.2f,", tLog[logRxIdx].hum - userSettings.RHOffset);
 			len += sprintf(pBuffer + len, "%ld,", tLog[logRxIdx].co2);
 			logRxIdx++;
 			if (logRxIdx > MAXLOGVALUES)
@@ -353,7 +379,6 @@ int getNewMeasValuesScript(char *pBuffer, int count) {
 			left = count - len;
 
 		} while ((logRxIdx != logTxIdx) && (left > 40));
-
 	}
 	return len;
 }
@@ -387,8 +412,8 @@ int getLogScript(char *pBuffer, int count) {
 		if (logsToSend) {
 			do {
 				len += sprintf(pBuffer + len, "%ld,", tLog[logRxIdx].timeStamp);
-				len += sprintf(pBuffer + len, "%3.2f,", tLog[logRxIdx].temperature-userSettings.temperatureOffset );
-				len += sprintf(pBuffer + len, "%3.2f,", tLog[logRxIdx].hum-userSettings.RHOffset);
+				len += sprintf(pBuffer + len, "%3.2f,", tLog[logRxIdx].temperature - userSettings.temperatureOffset);
+				len += sprintf(pBuffer + len, "%3.2f,", tLog[logRxIdx].hum - userSettings.RHOffset);
 				len += sprintf(pBuffer + len, "%ld\n", tLog[logRxIdx].co2);
 				logRxIdx++;
 				if (logRxIdx >= MAXLOGVALUES)
@@ -401,7 +426,6 @@ int getLogScript(char *pBuffer, int count) {
 	}
 	return len;
 }
-
 
 int getSensorNameScript(char *pBuffer, int count) {
 	int len = 0;
@@ -424,8 +448,9 @@ int getInfoValuesScript(char *pBuffer, int count) {
 	case 0:
 		scriptState++;
 		len += sprintf(pBuffer + len, "%s\n", "Meting,Actueel,Offset");
-		len += sprintf(pBuffer + len, "Temperatuur ,%3.2f,%3.2f\n", lastTemperature -userSettings.temperatureOffset, userSettings.temperatureOffset); // send values and offset
-		len += sprintf(pBuffer + len, "RH ,%3.1f,%3.2f\n", lastRH -userSettings.RHOffset, userSettings.RHOffset); // send values and offset
+		len += sprintf(pBuffer + len, "Temperatuur ,%3.2f,%3.2f\n", lastTemperature - userSettings.temperatureOffset,
+					   userSettings.temperatureOffset);															   // send values and offset
+		len += sprintf(pBuffer + len, "RH ,%3.1f,%3.2f\n", lastRH - userSettings.RHOffset, userSettings.RHOffset); // send values and offset
 
 		return len;
 		break;
@@ -466,24 +491,22 @@ void parseCGIWriteData(char *buf, int received) {
 	float ref;
 	bool save = false;
 
-	if (sscanf( buf ,"setCal:Temperatuur=%f", &ref) == 1 ) {
+	if (sscanf(buf, "setCal:Temperatuur=%f", &ref) == 1) {
 		userSettings.temperatureOffset = lastVal.temperature - ref;
 		ESP_LOGI(TAG, "temperatureOffset set to %f", userSettings.temperatureOffset);
 		save = true;
 	}
-	if (sscanf( buf ,"setCal:RH=%f", &ref) == 1 ) {
+	if (sscanf(buf, "setCal:RH=%f", &ref) == 1) {
 		userSettings.RHOffset = lastVal.hum - ref;
 		ESP_LOGI(TAG, "RHOffset set to %f", userSettings.RHOffset);
 		save = true;
 	}
 
-	if (sscanf( buf ,"setName:moduleName=%s", userSettings.moduleName) == 1 ) {
+	if (sscanf(buf, "setName:moduleName=%s", userSettings.moduleName) == 1) {
 		ESP_LOGI(TAG, "Hostname set to %s", userSettings.moduleName);
 		save = true;
 	}
 
-	if ( save )
+	if (save)
 		saveSettings();
-
 }
-

@@ -96,10 +96,10 @@ esp_err_t loadSettings() {
 		nvs_close(my_handle);
 	}
 // can be removed
-	if (strcmp(wifiSettings.upgradeFileName, CONFIG_FIRMWARE_UPGRADE_FILENAME) != 0) {
-		strcpy(wifiSettings.upgradeFileName, CONFIG_FIRMWARE_UPGRADE_FILENAME);
-		doSave = true;  // set filename for OTA via factory firmware
-	}
+	// if (strcmp(wifiSettings.upgradeFileName, CONFIG_FIRMWARE_UPGRADE_FILENAME) != 0) {
+	// 	strcpy(wifiSettings.upgradeFileName, CONFIG_FIRMWARE_UPGRADE_FILENAME);
+	// 	doSave = true;  // set filename for OTA via factory firmware
+	// }
 
 	if(strncmp(userSettings.checkstr,USERSETTINGS_CHECKSTR, strlen (USERSETTINGS_CHECKSTR) )	!= 0)
 	{
