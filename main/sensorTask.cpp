@@ -290,23 +290,21 @@ void sensorTask(void *pvParameter) {
 		sprintf(line, "CO2:%d", CO2value);
 		xQueueSend(displayMssgBox, &recDdisplayMssg, 0);
 		xQueueReceive(displayReadyMssgBox, &recDdisplayMssg, portMAX_DELAY);
-					//	sprintf(str, "%s,%2.0f,%2.2f,%3.1f,%d", userSettings.moduleName, lastVal.co2, lastVal.temperature, lastVal.hum, rssi);
+		//	sprintf(str, "%s,%2.0f,%2.2f,%3.1f,%d", userSettings.moduleName, lastVal.co2, lastVal.temperature, lastVal.hum, rssi);
 
-		int rssi = getRssi();				
-		sprintf(str, "S0,%d,%2.2f,%3.1f,%d\n\r", CO2value, temperature ,humidity, rssi);
+		int rssi = getRssi();
+		sprintf(str, "S0,%d,%2.2f,%3.1f,%d\n\r", CO2value, temperature, humidity, rssi);
 		UDPsendMssg(UDPTXPORT, str, strlen(str));
-		if( enableAutCal) {
+		if (enableAutCal) {
 			vTaskDelay(10);
 			UDPsendMssg(UDPCALTXPORT, str, strlen(str));
 		}
-				
+
 		printf(" CO2: %d ppm", CO2value);
 		sprintf(str, "2:%d", CO2value);
 		if (connectStatus == IP_RECEIVED) {
 			UDPsendMssg(UDPTXPORT, str, strlen(str));
 		}
-
-
 
 	} else {
 		printf(" Error reading CO2 ");
@@ -489,7 +487,7 @@ int cancelSettingsScript(char *pBuffer, int count) {
 	return 0;
 }
 
-int enableAutCalScript (char *pBuffer, int count) {
+int enableAutCalScript(char *pBuffer, int count) {
 	switch (scriptState) {
 	case 0:
 		scriptState++;
@@ -502,7 +500,7 @@ int enableAutCalScript (char *pBuffer, int count) {
 	}
 	return 0;
 }
-int disableAutCalScript (char *pBuffer, int count) {
+int disableAutCalScript(char *pBuffer, int count) {
 	switch (scriptState) {
 	case 0:
 		scriptState++;
@@ -516,20 +514,17 @@ int disableAutCalScript (char *pBuffer, int count) {
 	return 0;
 }
 
-
 int clearLogScript(char *pBuffer, int count) {
 	if (scriptState == 0) { // find oldest value in cyclic logbuffer
 		logRxIdx = 0;
 		logTxIdx = 0;
-		memset(&tLog, 0, sizeof( tLog));
+		memset(&tLog, 0, sizeof(tLog));
 		strcpy(pBuffer, "OK");
 		scriptState++;
 		return 3;
 	}
 	return 0;
 }
-
-
 
 // "setCal:Temperatuur=23"
 

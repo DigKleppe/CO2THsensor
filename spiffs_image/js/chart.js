@@ -21,8 +21,8 @@ var MAXPOINTS = LOGDAYS * 24 * 60 / MINUTESPERTICK;
 
 var SIMULATE = false;
 
-var displayNames = ["", "temperatuur", "vochtigheid", "CO2", "ref"];
-var dayNames = ['zo','ma', 'di', 'wo', 'do', 'vr', 'za'];
+var displayNames = ["", "temperatuur", "RH", "CO2"];
+var dayNames = ['zo', 'ma', 'di', 'wo', 'do', 'vr', 'za'];
 
 var CO2Options = {
 	title: '',
@@ -118,16 +118,19 @@ function initChart() {
 
 	var cb = document.getElementById('autoCalCB');
 	cb.addEventListener('click', function (evt) {
-			if (this.checked) {
-				getItem("enableAutCal")
-			}
-			else { 
-				getItem("disableAutCal")
-			}
-		});
+		if (this.checked) {
+			getItem("enableAutCal")
+		}
+		else {
+			getItem("disableAutCal")
+		}
+	});
 
 	chartRdy = true;
 	dontDraw = false;
+
+//	calcDerivates( 20.2, 65);  // dewpoint and heat index
+
 	if (SIMULATE)
 		simplot();
 	else
@@ -136,7 +139,7 @@ function initChart() {
 
 function startTimer() {
 	if (!SIMULATE)
-		setInterval(function() { timer() }, 1000);
+		setInterval(function () { timer() }, 1000);
 }
 
 var firstRequest = true;
@@ -274,13 +277,47 @@ function plotArrays(str) {
 }
 
 
+// https://sensirion.com/media/documents/A419127A/6836C0D2/Sensirion_AppNotes_Humidity_Sensors_at_a_Glance.pdf
+
+function calcDerivates(T, RH) {
+	// calc heat index
+	if ( RH < 0)
+		RH = 0;
+	if ( RH > 100)
+		RH = 100;
+//	RH = max(0, min(RH, 100));
+	var HI = 1.1 * T;
+	HI += (5.0 * (0.047 * RH - 7.1)) / 9.0;
+
+	if ((HI + T)/2 >= 26.7 ) {
+		HI = - 8.78469475556
+			+ 1.61139411 * T
+			+ 2.33854883889 * RH
+			- 0.14611605 * T * RH
+			- 0.012308094 * T * T
+			- 0.0164248277778 * RH * RH
+			+ 0.002211732 * T * T * RH
+			+ 0.00072546 * T * RH * RH
+			- 0.000003582 * T * T * RH * RH;
+	}
+	if (RH < 13 && T > 26.7 && T < 44.4)
+		HI = HI + (5 / 36) * (RH - 13) * sqrt((17 - abs(1.8 * T - 63)) / 17) - 160 / 9;
+	if (RH > 85 && T > 26.7 && T < 30.6)
+		HI = HI + 5 * (RH - 85) * (55 - 1.8 * T) / 450 - 160 / 9;
+	document.getElementById('HI').innerHTML = HI.toFixed(2);
+
+//	RH = max(0, min(RH,100));
+	var h = ( Math.log10(RH) - 2.0) / 0.4343 + (17.62 * T) / (243.12 + T);
+	var Td = 243.12 * h / (17.62 - h);
+	document.getElementById('DP').innerHTML  = Td.toFixed(2);;  // dewpoint
+}
+
 function timer() {
 	var arr;
 	var str;
 
 	if (SIMULATE) {
 		simplot();
-
 	}
 	else {
 		presc--;
@@ -300,7 +337,7 @@ function timer() {
 								arr[m] = "--";
 							document.getElementById(displayNames[m]).innerHTML = arr[m];
 						}
-
+						calcDerivates(parseFloat(arr[1]), parseFloat(arr[2]));  // dewpoint and heat index
 						plotTempAndRH(1, arr[1]); // temperature
 						plotTempAndRH(2, arr[2]); // RH
 						plotCO2(1, arr[3]); // CO2
@@ -316,7 +353,7 @@ function timer() {
 				arr = getLogMeasValues();
 				plotArray(arr);
 				firstRequest = false;
-				setInterval(function() { timer() }, 10000);
+				setInterval(function () { timer() }, 10000);
 			}
 		}
 	}
