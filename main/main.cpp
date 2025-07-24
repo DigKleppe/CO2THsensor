@@ -11,6 +11,7 @@
 #include "wifiConnect.h"
 #include "settings.h"
 #include "guiTask.h"
+#include "clockTask.h"
 
 #include <esp_err.h>
 
@@ -74,7 +75,13 @@ extern "C" void app_main(void) {
 
 	xTaskCreate(sensorTask, "sensorTask", 1024 * 5, (void*) 0, 10, NULL);
 
-	vTaskDelay(1000);
+	do {
+		vTaskDelay(100);
+	} while (connectStatus != IP_RECEIVED);
+	
+	xTaskCreate(clockTask, "clock", 4 * 1024, NULL, 0, NULL);
+
+//	vTaskDelay(1000);
 
 	while (1) {
 		if (OldconnectStatus != connectStatus) {

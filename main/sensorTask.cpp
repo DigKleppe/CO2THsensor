@@ -45,7 +45,7 @@ Averager humidityHourBuffer(60 / SAMPLEPERIOD);
 Averager CO2HourBuffer(60 / SAMPLEPERIOD);
 
 time_t now;
-struct tm timeinfo;
+
 
 #define I2C_EXAMPLE_MASTER_SCL_IO 19		/*!< gpio number for I2C master clock */
 #define I2C_EXAMPLE_MASTER_SDA_IO 18		/*!< gpio number for I2C master data  */
@@ -80,6 +80,7 @@ typedef struct {
 	int32_t co2;
 } log_t;
 
+extern struct tm timeinfo;
 static log_t tLog[MAXLOGVALUES];
 static log_t lastVal;
 static int timeStamp = 1;
@@ -184,6 +185,11 @@ void sensorTask(void *pvParameter) {
 	log_t tempVal;
 	int32_t iTemperature, iHumidity; // temperary
 
+	bool mssgToSend = false;
+	int sendTime;
+
+	localtime_r(&now, &timeinfo);
+
 	float temperature = 0, humidity = 0;
 	int CO2value = 0;
 	int tempCO2value = 0;
@@ -229,6 +235,8 @@ void sensorTask(void *pvParameter) {
 
 	while (1) {
 		vTaskDelayUntil(&xLastWakeTime, xPeriod);
+		time(&now);
+		localtime_r(&now, &timeinfo);
 
 #ifdef SIMULATE
 		err = ESP_OK;
@@ -294,24 +302,34 @@ void sensorTask(void *pvParameter) {
 
 		int rssi = getRssi();
 		sprintf(str, "S0,%d,%2.2f,%3.1f,%d\n\r", CO2value, temperature, humidity, rssi);
-		UDPsendMssg(UDPTXPORT, str, strlen(str));
+		sendTime = ((timeinfo.tm_sec / 10) + 1 * 10); // timeslot 10 , 20 etc
+		if (sendTime >= 59)
+			sendTime -= 59;
+
+		mssgToSend = true;
+
+		//		UDPsendMssg(UDPTXPORT, str, strlen(str));
 		if (enableAutCal) {
 			vTaskDelay(10);
 			UDPsendMssg(UDPCALTXPORT, str, strlen(str));
 		}
 
-		printf(" CO2: %d ppm", CO2value);
-		sprintf(str, "2:%d", CO2value);
-		if (connectStatus == IP_RECEIVED) {
-			UDPsendMssg(UDPTXPORT, str, strlen(str));
-		}
+		// printf(" CO2: %d ppm", CO2value);
+		// sprintf(str, "2:%d", CO2value);
 
 	} else {
 		printf(" Error reading CO2 ");
 		// measValues.CO2value = 9999;
 	}
-	time(&now);
-	localtime_r(&now, &timeinfo);
+	if (mssgToSend) {
+		if (sendTime == timeinfo.tm_sec) { // send at 10, 20  for module 0 , 11, 21 for module 1  etc
+			UDPsendMssg(UDPTXPORT, str, strlen(str));
+			ESP_LOGI(TAG, "UDP send %s %d", str, timeinfo.tm_sec);
+			mssgToSend = false;
+		}
+	}
+
+
 #ifdef FAST
 	if (1) {
 		minutePassed = false;
