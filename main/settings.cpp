@@ -25,9 +25,6 @@ char checkstr[MAX_STRLEN+1];
 
 const userSettings_t userSettingsDefaults = {
 	CONFIG_MDNS_HOSTNAME ,
-	"0.0",
-	0,
-	0,
 	USERSETTINGS_CHECKSTR
 };
 

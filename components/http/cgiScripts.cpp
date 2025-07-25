@@ -61,15 +61,11 @@ int readDescriptors(char *pBuffer, int count);
 
 // do not alter
 static const tCGI CGIurls[NUM_CGIurls] = {
-		{ "/cgi-bin/Readvar", (tCGIHandler_t) readCGIvalues, (CGIresponseFileHandler_t) readVarScript },  // !!!!!! index  !!
-		{ "/action_page.php", (tCGIHandler_t) readCGIvalues,(CGIresponseFileHandler_t) actionRespScript },
+//		{ "/cgi-bin/Readvar", (tCGIHandler_t) readCGIvalues, (CGIresponseFileHandler_t) readVarScript },  // !!!!!! index  !!
+//		{ "/action_page.php", (tCGIHandler_t) readCGIvalues,(CGIresponseFileHandler_t) actionRespScript },
 		{ "/cgi-bin/getLogMeasValues", (tCGIHandler_t) readCGIvalues, (CGIresponseFileHandler_t) getLogScript},
 		{ "/cgi-bin/getRTMeasValues", (tCGIHandler_t) readCGIvalues, (CGIresponseFileHandler_t) getRTMeasValuesScript},
-		{ "/cgi-bin/getInfoValues", (tCGIHandler_t) readCGIvalues, (CGIresponseFileHandler_t) getInfoValuesScript},
-	    { "/cgi-bin/getCalValues", (tCGIHandler_t) readCGIvalues, (CGIresponseFileHandler_t) getCalValuesScript},
 		{ "/cgi-bin/getSensorName", (tCGIHandler_t) readCGIvalues, (CGIresponseFileHandler_t) getSensorNameScript},
-		{ "/cgi-bin/saveSettings", (tCGIHandler_t) readCGIvalues, (CGIresponseFileHandler_t) saveSettingsScript},
-		{ "/cgi-bin/cancelSettings", (tCGIHandler_t) readCGIvalues, (CGIresponseFileHandler_t) cancelSettingsScript},
 		{ "/cgi-bin/enableAutCal", (tCGIHandler_t) readCGIvalues, (CGIresponseFileHandler_t) enableAutCalScript},
 		{ "/cgi-bin/disableAutCal", (tCGIHandler_t) readCGIvalues, (CGIresponseFileHandler_t) disableAutCalScript},
 		{ "/cgi-bin/clearLog", (tCGIHandler_t) readCGIvalues, (CGIresponseFileHandler_t) clearLogScript},
