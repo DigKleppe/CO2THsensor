@@ -15,9 +15,9 @@
 
 #include "averager.h"
 
-extern Averager temperatureHourBuffer;
-extern Averager humidityHourBuffer;
-extern Averager CO2HourBuffer;
+extern Averager temperatureAverager;
+extern Averager RHaverager;
+extern Averager CO2Averager;
 
 extern Averager temperatureDayBuffer;
 extern Averager humidityDayBuffer;

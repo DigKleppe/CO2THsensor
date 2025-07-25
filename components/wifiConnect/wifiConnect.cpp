@@ -24,7 +24,7 @@ handles wifi connect process
 #include "esp_smartconfig.h"
 #include "wifiConnect.h"
 #ifndef CONFIG_FIXED_LAST_IP_DIGIT
-#define CONFIG_FIXED_LAST_IP_DIGIT 99 // ip will be xx.xx.xx.pp    xx from DHCP  , <= 0 disables this
+#define CONFIG_FIXED_LAST_IP_DIGIT 00 // ip will be xx.xx.xx.pp    xx from DHCP  , <= 0 disables this  (sntp does not work!)
 #endif
 
 /*set wps mode via project configuration */

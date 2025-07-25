@@ -25,12 +25,14 @@
 #include <sys/time.h>
 #include <time.h>
 
+#include "averager.h"
 #include "cgiScripts.h"
 #include "guiTask.h"
 #include "sensorTask.h"
 #include "sht4x.h"
 #include "udpClient.h"
 #include "wifiConnect.h"
+#include "clockTask.h"
 
 static const char *TAG = "sensorTask";
 
@@ -38,14 +40,13 @@ static const char *TAG = "sensorTask";
 #define TIMER_SCALE (TIMER_BASE_CLK / TIMER_DIVIDER) // convert counter value to seconds
 #define TIMERIDX 0									 // timer 0 group 0 used
 
-#define SAMPLEPERIOD 10 // seconds
+#define SAMPLEPERIOD 5 // seconds
 
-Averager temperatureHourBuffer(60 / SAMPLEPERIOD); // todo make minute
-Averager humidityHourBuffer(60 / SAMPLEPERIOD);
-Averager CO2HourBuffer(60 / SAMPLEPERIOD);
+Averager temperatureAverager(60 / SAMPLEPERIOD);
+Averager RHaverager(60 / SAMPLEPERIOD);
+Averager CO2Averager(60 / SAMPLEPERIOD);
 
 time_t now;
-
 
 #define I2C_EXAMPLE_MASTER_SCL_IO 19		/*!< gpio number for I2C master clock */
 #define I2C_EXAMPLE_MASTER_SDA_IO 18		/*!< gpio number for I2C master data  */
@@ -67,8 +68,8 @@ time_t now;
 static esp_err_t readC02(i2c_port_t i2c_num, int *pValue);
 static void i2c_master_init();
 
-#define LOGINTERVAL 60	  // seconds
-#define MEASUREINTERVAL 1 //
+#define LOGINTERVAL 60 // seconds
+// #define MEASUREINTERVAL 1 //
 #define MAXLOGVALUES (24 * 60)
 #define UDPTXPORT 5050
 #define UDPCALTXPORT 5051
@@ -80,7 +81,6 @@ typedef struct {
 	int32_t co2;
 } log_t;
 
-extern struct tm timeinfo;
 static log_t tLog[MAXLOGVALUES];
 static log_t lastVal;
 static int timeStamp = 1;
@@ -172,21 +172,48 @@ static void i2c_master_init() {
 	i2c_param_config(i2c_master_port, &conf);
 	i2c_driver_install(i2c_master_port, conf.mode, I2C_EXAMPLE_MASTER_RX_BUF_DISABLE, I2C_EXAMPLE_MASTER_TX_BUF_DISABLE, 0);
 }
+// sends averaged values at 10, 20 , 30 abs seconds ,  11,21,31 for module 1 etc
+void updTransmitTask(void *pvParameter) {
+
+	time_t now;
+	struct tm timeinfo;
+	char str[80];
+	bool isSend = false;
+
+	vTaskDelay( 5000/ portTICK_PERIOD_MS); // wait to start for samples to collect
+
+	while (1) {
+		vTaskDelay(100 / portTICK_PERIOD_MS);
+		time(&now);
+		localtime_r(&now, &timeinfo);
+		if ((timeinfo.tm_sec % 10) == 0) {
+			if (!isSend) {
+				isSend = true;
+				sprintf(str, "S0,%d,%2.2f,%3.1f,%d\n\r",(int) (CO2Averager.average()/ 1000.0), temperatureAverager.average() / 1000.0,
+						RHaverager.average() / 1000.0, getRssi());
+				UDPsendMssg(UDPTXPORT, str, strlen(str));
+				ESP_LOGI(TAG, "UDP send %s %d", str, timeinfo.tm_sec);
+				if (enableAutCal) {
+					vTaskDelay(10);
+					UDPsendMssg(UDPCALTXPORT, str, strlen(str));
+				}
+			}
+		} else
+			isSend = false;
+	}
+}
 
 void sensorTask(void *pvParameter) {
 	uint32_t xLastWakeTime;
+	struct tm timeinfo;
 #ifdef SIMULATE
 	const uint32_t xPeriod = (500 / portTICK_PERIOD_MS);
 	int n;
 #else
-	const uint32_t xPeriod = (5000 / portTICK_PERIOD_MS);
+	const uint32_t xPeriod = (SAMPLEPERIOD * 1000 / portTICK_PERIOD_MS);
 #endif
-	char str[20];
 	log_t tempVal;
 	int32_t iTemperature, iHumidity; // temperary
-
-	bool mssgToSend = false;
-	int sendTime;
 
 	localtime_r(&now, &timeinfo);
 
@@ -218,6 +245,8 @@ void sensorTask(void *pvParameter) {
 		SHTpresent = true;
 	} else
 		printf("\nSHT45 not found!");
+	
+	xTaskCreate(updTransmitTask, "udptx", 4 * 1024, NULL, 0, NULL);
 
 	xLastWakeTime = xTaskGetTickCount();
 
@@ -255,8 +284,8 @@ void sensorTask(void *pvParameter) {
 				lastRH = humidity;
 			}
 #endif
-		humidityHourBuffer.write((uint16_t)(100.0 * humidity)); // use last values for graph
-		temperatureHourBuffer.write((uint16_t)(100.0 * temperature));
+		RHaverager.write((uint16_t)(1000.0 * humidity)); // use last values for graph
+		temperatureAverager.write((uint16_t)(1000.0 * temperature));
 	}
 	else {
 		temperature = 999;
@@ -282,7 +311,7 @@ void sensorTask(void *pvParameter) {
 	} else {
 		//	measValues.temperature = 9999;
 		//	measValues.humidity = 9999;
-		printf("\n error reading DHT: %x ", err);
+		printf("\n error reading SHT: %x ", err);
 	}
 #ifndef SIMULATE
 	err = readC02(I2C_NUM_1, &tempCO2value);
@@ -290,7 +319,7 @@ void sensorTask(void *pvParameter) {
 		CO2value = tempCO2value;
 #endif
 	if (CO2value > 300)
-		CO2HourBuffer.write(CO2value);
+		CO2Averager.write(CO2value * 1000);
 
 	if (err == ESP_OK) {
 		I2Ctimeout = 10;
@@ -298,37 +327,10 @@ void sensorTask(void *pvParameter) {
 		sprintf(line, "CO2:%d", CO2value);
 		xQueueSend(displayMssgBox, &recDdisplayMssg, 0);
 		xQueueReceive(displayReadyMssgBox, &recDdisplayMssg, portMAX_DELAY);
-		//	sprintf(str, "%s,%2.0f,%2.2f,%3.1f,%d", userSettings.moduleName, lastVal.co2, lastVal.temperature, lastVal.hum, rssi);
-
-		int rssi = getRssi();
-		sprintf(str, "S0,%d,%2.2f,%3.1f,%d\n\r", CO2value, temperature, humidity, rssi);
-		sendTime = ((timeinfo.tm_sec / 10) + 1 * 10); // timeslot 10 , 20 etc
-		if (sendTime >= 59)
-			sendTime -= 59;
-
-		mssgToSend = true;
-
-		//		UDPsendMssg(UDPTXPORT, str, strlen(str));
-		if (enableAutCal) {
-			vTaskDelay(10);
-			UDPsendMssg(UDPCALTXPORT, str, strlen(str));
-		}
-
-		// printf(" CO2: %d ppm", CO2value);
-		// sprintf(str, "2:%d", CO2value);
-
 	} else {
 		printf(" Error reading CO2 ");
 		// measValues.CO2value = 9999;
 	}
-	if (mssgToSend) {
-		if (sendTime == timeinfo.tm_sec) { // send at 10, 20  for module 0 , 11, 21 for module 1  etc
-			UDPsendMssg(UDPTXPORT, str, strlen(str));
-			ESP_LOGI(TAG, "UDP send %s %d", str, timeinfo.tm_sec);
-			mssgToSend = false;
-		}
-	}
-
 
 #ifdef FAST
 	if (1) {
@@ -339,17 +341,11 @@ void sensorTask(void *pvParameter) {
 
 		if (!minutePassed) {
 			minutePassed = true;
-			tempVal.co2 = CO2HourBuffer.average();
-			tempVal.temperature = temperatureHourBuffer.average() / 100.0;
-			tempVal.hum = humidityHourBuffer.average() / 100.0;
+			tempVal.co2 = CO2Averager.average() / 1000.0;
+			tempVal.temperature = temperatureAverager.average() / 1000.0;
+			tempVal.hum = RHaverager.average() / 1000.0;
 			tempVal.timeStamp = timeStamp++;
 			lastVal = tempVal;
-
-			if (abs(tempVal.temperature - lastVal.temperature) >= 4.0) { // spike error
-				tempVal.temperature = lastVal.temperature;
-				tempVal.hum = lastVal.hum;
-			}
-
 			tLog[logTxIdx] = tempVal;
 
 			logTxIdx++;

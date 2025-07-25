@@ -11,8 +11,6 @@
 #include <time.h>
 #include <sys/time.h>
 
-extern struct tm timeinfo;
-
 void clockTask(void *pvParameter);
 extern volatile bool clockSynced; 
 

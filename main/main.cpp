@@ -60,7 +60,7 @@ extern "C" void app_main(void) {
 	ESP_ERROR_CHECK(esp_event_loop_create_default());
 
 	loadSettings();
-//	xTaskCreate(&blinkTask, "blink", 8192, NULL, 5, NULL);
+
 	xTaskCreate(&guiTask, "guiTask", 1024 * 4, NULL, 0, NULL);
 	do {
 		vTaskDelay(10);
@@ -80,8 +80,6 @@ extern "C" void app_main(void) {
 	} while (connectStatus != IP_RECEIVED);
 	
 	xTaskCreate(clockTask, "clock", 4 * 1024, NULL, 0, NULL);
-
-//	vTaskDelay(1000);
 
 	while (1) {
 		if (OldconnectStatus != connectStatus) {
